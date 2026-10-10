@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
@@ -13,6 +12,7 @@ import 'package:vikunja_app/presentation/manager/task_page_controller.dart';
 import 'package:vikunja_app/presentation/pages/error_widget.dart';
 import 'package:vikunja_app/presentation/pages/loading_widget.dart';
 import 'package:vikunja_app/presentation/widgets/empty_view.dart';
+import 'package:vikunja_app/presentation/widgets/searchable_app_bar.dart';
 import 'package:vikunja_app/presentation/widgets/task/add_task_dialog.dart';
 import 'package:vikunja_app/presentation/widgets/task/task_list_item.dart';
 import 'package:vikunja_app/presentation/widgets/task/task_tree_item.dart';
@@ -33,7 +33,7 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
     return pageModel.when(
       data: (model) {
         return Scaffold(
-          appBar: _buildAppBar(ref, context, model.onlyDueDate),
+          appBar: _buildAppBar(ref, context, model),
           body: RefreshIndicator(
             onRefresh: () async {
               ref.read(taskPageControllerProvider.notifier).reload();
@@ -73,7 +73,22 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
 
   Widget _buildList(WidgetRef ref, BuildContext context, TaskPageModel model) {
     if (model.tasks.isEmpty) {
-      return EmptyView(Icons.list, AppLocalizations.of(context).noTasks);
+      // Scrollable, so pull-to-refresh still works; the message depends on whether a search is active.
+      return ListView(
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(
+            height: MediaQuery.sizeOf(context).height * 0.5,
+            child: EmptyView(
+              Icons.list,
+              model.searchQuery.isEmpty
+                  ? AppLocalizations.of(context).noTasks
+                  : AppLocalizations.of(context).noSearchResults,
+            ),
+          ),
+        ],
+      );
     }
 
     final hierarchical =
@@ -89,6 +104,8 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
     final tasks = model.tasks;
     final itemCount = tasks.length + (model.isLoadingNextPage ? 1 : 0);
     return ListView.separated(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
+      physics: const AlwaysScrollableScrollPhysics(),
       itemCount: itemCount,
       separatorBuilder: (_, __) => const Divider(height: 8),
       itemBuilder: (context, index) {
@@ -127,16 +144,18 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
     final subtaskIds = <int>{};
     for (final task in model.tasks) {
       if (task.subtasks.isNotEmpty) {
-        subtaskMap[task.id] =
-            task.subtasks.map((s) => taskById[s.id] ?? s).toList();
+        subtaskMap[task.id] = task.subtasks
+            .map((s) => taskById[s.id] ?? s)
+            .toList();
         for (final s in task.subtasks) {
           subtaskIds.add(s.id);
         }
       }
     }
 
-    final topLevelTasks =
-        model.tasks.where((t) => !subtaskIds.contains(t.id)).toList();
+    final topLevelTasks = model.tasks
+        .where((t) => !subtaskIds.contains(t.id))
+        .toList();
 
     Future<bool> reorderSubtask(Task movedTask, double newPosition) async {
       final res = await ref
@@ -146,6 +165,8 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
     }
 
     return ReorderableListView.builder(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
+      physics: const AlwaysScrollableScrollPhysics(),
       buildDefaultDragHandles: false,
       onReorder: (_, __) {},
       itemCount: topLevelTasks.length + (model.isLoadingNextPage ? 1 : 0),
@@ -181,9 +202,19 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
     );
   }
 
-  AppBar _buildAppBar(WidgetRef ref, BuildContext context, bool onlyDueDate) {
-    return AppBar(
-      title: Text("Vikunja"),
+  SearchableAppBar _buildAppBar(
+    WidgetRef ref,
+    BuildContext context,
+    TaskPageModel model,
+  ) {
+    return SearchableAppBar(
+      title: 'Vikunja',
+      searchHint: AppLocalizations.of(context).searchTasksHint,
+      searchQuery: model.searchQuery,
+      showProgress: model.isSearching,
+      onSearchChanged: (query) {
+        ref.read(taskPageControllerProvider.notifier).setSearchQuery(query);
+      },
       actions: [
         PopupMenuButton(
           itemBuilder: (BuildContext context) {
@@ -191,7 +222,7 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
               PopupMenuItem(
                 child: InkWell(
                   onTap: () {
-                    _onlyDueDateChanged(ref, context, !onlyDueDate);
+                    _onlyDueDateChanged(ref, context, !model.onlyDueDate);
                   },
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.end,
@@ -200,9 +231,9 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
                         AppLocalizations.of(context).onlyShowTasksWithDueDate,
                       ),
                       Checkbox(
-                        value: onlyDueDate,
+                        value: model.onlyDueDate,
                         onChanged: (bool? value) {
-                          _onlyDueDateChanged(ref, context, !onlyDueDate);
+                          _onlyDueDateChanged(ref, context, !model.onlyDueDate);
                         },
                       ),
                     ],
@@ -275,5 +306,4 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
       }
     }
   }
-
 }

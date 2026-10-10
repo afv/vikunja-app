@@ -27,7 +27,9 @@ class ProjectTaskList extends ConsumerWidget {
     return projectController.when(
       data: (pageModel) {
         List<Widget> children = [];
-        if (project.subprojects.isNotEmpty) {
+        final showSubprojects =
+            project.subprojects.isNotEmpty && pageModel.searchQuery.isEmpty;
+        if (showSubprojects) {
           if (pageModel.tasks.isNotEmpty) {
             children.add(
               SliverToBoxAdapter(
@@ -41,7 +43,7 @@ class ProjectTaskList extends ConsumerWidget {
           children.addAll(_buildProjectList(context));
         }
         if (pageModel.tasks.isNotEmpty) {
-          if (project.subprojects.isNotEmpty) {
+          if (showSubprojects) {
             children.add(
               SliverToBoxAdapter(
                 child: _buildSectionHeader(
@@ -53,12 +55,16 @@ class ProjectTaskList extends ConsumerWidget {
           }
           final hierarchical =
               ref.watch(hierarchicalDisplayProvider).valueOrNull ?? false;
-          children.add(_buildTaskList(
-            ref,
-            pageModel.tasks,
-            hierarchical,
-            pageModel.displayDoneTask,
-          ));
+          children.add(
+            _buildTaskList(
+              ref,
+              pageModel.tasks,
+              hierarchical,
+              pageModel.displayDoneTask,
+              // Reordering a filtered (searched) list would write wrong positions.
+              enableReorder: pageModel.searchQuery.isEmpty,
+            ),
+          );
         }
 
         if (pageModel.isLoadingNextPage) {
@@ -78,11 +84,16 @@ class ProjectTaskList extends ConsumerWidget {
         }
 
         if (children.isNotEmpty) {
-          return CustomScrollView(slivers: children);
+          return CustomScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
+            slivers: children,
+          );
         } else {
           return EmptyView(
             Icons.list,
-            AppLocalizations.of(context).noTasksOrSubproject,
+            pageModel.searchQuery.isEmpty
+                ? AppLocalizations.of(context).noTasksOrSubproject
+                : AppLocalizations.of(context).noSearchResults,
           );
         }
       },
@@ -124,8 +135,9 @@ class ProjectTaskList extends ConsumerWidget {
     WidgetRef ref,
     List<Task> tasks,
     bool hierarchical,
-    bool displayDoneTask,
-  ) {
+    bool displayDoneTask, {
+    bool enableReorder = true,
+  }) {
     // Flat mode: show all tasks as individual draggable items.
     if (!hierarchical) {
       return SliverReorderableList(
@@ -146,7 +158,7 @@ class ProjectTaskList extends ConsumerWidget {
                   task: task,
                   depth: 0,
                   subtaskMap: const {},
-                  dragIndex: index,
+                  dragIndex: enableReorder ? index : null,
                   onCheckedChanged: (t) async {
                     final success = await ref
                         .read(projectControllerProvider(project).notifier)
@@ -200,8 +212,9 @@ class ProjectTaskList extends ConsumerWidget {
     final subtaskIds = <int>{};
     for (final task in tasks) {
       if (task.subtasks.isNotEmpty) {
-        subtaskMap[task.id] =
-            task.subtasks.map((s) => taskById[s.id] ?? s).toList();
+        subtaskMap[task.id] = task.subtasks
+            .map((s) => taskById[s.id] ?? s)
+            .toList();
         for (final s in task.subtasks) {
           subtaskIds.add(s.id);
         }
@@ -209,8 +222,7 @@ class ProjectTaskList extends ConsumerWidget {
     }
 
     // Only top-level tasks appear in the reorderable list.
-    final topLevel =
-        tasks.where((t) => !subtaskIds.contains(t.id)).toList();
+    final topLevel = tasks.where((t) => !subtaskIds.contains(t.id)).toList();
 
     // Get the list-view ID needed to persist task positions.
     final int? viewId = project.views
@@ -241,7 +253,7 @@ class ProjectTaskList extends ConsumerWidget {
                 task: task,
                 depth: 0,
                 subtaskMap: subtaskMap,
-                dragIndex: index,
+                dragIndex: enableReorder ? index : null,
                 onCheckedChanged: (t) async {
                   final success = await ref
                       .read(projectControllerProvider(project).notifier)
@@ -256,7 +268,9 @@ class ProjectTaskList extends ConsumerWidget {
                     );
                   }
                 },
-                onSubtaskReorder: viewId != null ? reorderSubtask : null,
+                onSubtaskReorder: enableReorder && viewId != null
+                    ? reorderSubtask
+                    : null,
               ),
               if (index < topLevel.length - 1) const Divider(height: 1),
             ],
@@ -271,12 +285,14 @@ class ProjectTaskList extends ConsumerWidget {
 
         final taskList = List<Task>.from(topLevel);
         final moved = taskList.removeAt(oldIndex);
-        final insertIndex =
-            newIndex == -1 ? 0 : newIndex.clamp(0, taskList.length);
+        final insertIndex = newIndex == -1
+            ? 0
+            : newIndex.clamp(0, taskList.length);
         taskList.insert(insertIndex, moved);
 
-        final before =
-            insertIndex == 0 ? null : taskList[insertIndex - 1].position;
+        final before = insertIndex == 0
+            ? null
+            : taskList[insertIndex - 1].position;
         final after = insertIndex == taskList.length - 1
             ? null
             : taskList[insertIndex + 1].position;
@@ -287,8 +303,7 @@ class ProjectTaskList extends ConsumerWidget {
 
         // Rebuild the full task list preserving subtasks: reordered top-level
         // items first, then any subtasks that were in the original task list.
-        final subtasks =
-            tasks.where((t) => subtaskIds.contains(t.id)).toList();
+        final subtasks = tasks.where((t) => subtaskIds.contains(t.id)).toList();
         final fullOrderedTasks = [...taskList, ...subtasks];
 
         ref
@@ -300,12 +315,12 @@ class ProjectTaskList extends ConsumerWidget {
               newPosition: newPos,
             )
             .then((success) {
-          if (!success && ref.context.mounted) {
-            ScaffoldMessenger.of(ref.context).showSnackBar(
-              const SnackBar(content: Text('Failed to reorder task')),
-            );
-          }
-        });
+              if (!success && ref.context.mounted) {
+                ScaffoldMessenger.of(ref.context).showSnackBar(
+                  const SnackBar(content: Text('Failed to reorder task')),
+                );
+              }
+            });
       },
     );
   }
