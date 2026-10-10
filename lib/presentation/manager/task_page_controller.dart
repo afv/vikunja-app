@@ -113,15 +113,16 @@ class TaskPageController extends _$TaskPageController
         .read(notificationProvider)
         ?.scheduleDueNotifications(ref.read(taskRepositoryProvider));
 
-    var showOnlyDueDateTasks = await ref
-        .read(settingsRepositoryProvider)
-        .getLandingPageOnlyDueDateTasks();
+    var settings = ref.read(settingsRepositoryProvider);
+    var showOnlyDueDateTasks = await settings.getLandingPageOnlyDueDateTasks();
+    var displayDoneTasks = await settings.getLandingPageDisplayDoneTasks();
 
     return TaskPageModel(
       tasks,
       showOnlyDueDateTasks,
       defaultProjectId,
       false,
+      displayDoneTasks: displayDoneTasks,
       searchQuery: _currentSearchQuery,
     );
   }
@@ -175,9 +176,9 @@ class TaskPageController extends _$TaskPageController
     String? searchQuery,
   }) async {
     final query = searchQuery ?? _currentSearchQuery;
-    var showOnlyDueDateTasks = await ref
-        .read(settingsRepositoryProvider)
-        .getLandingPageOnlyDueDateTasks();
+    var settings = ref.read(settingsRepositoryProvider);
+    var showOnlyDueDateTasks = await settings.getLandingPageOnlyDueDateTasks();
+    var displayDoneTasks = await settings.getLandingPageDisplayDoneTasks();
 
     var user = ref.read(currentUserProvider);
     if (user != null) {
@@ -202,7 +203,10 @@ class TaskPageController extends _$TaskPageController
       }
     }
 
-    List<String> filterStrings = ["done = false"];
+    List<String> filterStrings = [];
+    if (!displayDoneTasks) {
+      filterStrings.add("done = false");
+    }
     if (showOnlyDueDateTasks) {
       filterStrings.add("due_date > 0001-01-01 00:00");
     }
@@ -227,6 +231,14 @@ class TaskPageController extends _$TaskPageController
     await ref
         .read(settingsRepositoryProvider)
         .setLandingPageOnlyDueDateTasks(newValue);
+
+    reload();
+  }
+
+  Future<void> setLandingPageDisplayDoneTasks(bool newValue) async {
+    await ref
+        .read(settingsRepositoryProvider)
+        .setLandingPageDisplayDoneTasks(newValue);
 
     reload();
   }
@@ -269,20 +281,45 @@ class TaskPageController extends _$TaskPageController
     return false;
   }
 
-  Future<bool> markAsDone(Task task) async {
-    task.done = true;
+  Future<bool> markAsDone(Task task, bool done) async {
+    if (task.loading) {
+      return false;
+    }
+
+    final previousDone = task.done;
+    task.loading = true;
+    _emitTasks(state.value?.tasks);
+
+    task.done = done;
     var response = await ref.read(taskRepositoryProvider).update(task);
+    task.loading = false;
+
+    var value = state.value;
     if (response.isSuccessful) {
-      var value = state.value;
       if (value != null) {
-        var tasks = value.tasks;
-        tasks.removeWhere((element) => element.id == task.id);
-        state = AsyncData(value.copyWith(tasks: tasks));
+        if (done && !value.displayDoneTasks) {
+          final tasks = List<Task>.from(value.tasks)
+            ..removeWhere((element) => element.id == task.id);
+          state = AsyncData(value.copyWith(tasks: tasks));
+        } else {
+          _emitTasks(value.tasks);
+        }
       }
 
       return true;
     }
 
+    task.done = previousDone;
+    _emitTasks(value?.tasks);
     return false;
+  }
+
+  void _emitTasks(List<Task>? tasks) {
+    final value = state.value;
+    if (value == null || tasks == null) {
+      return;
+    }
+
+    state = AsyncData(value.copyWith(tasks: List<Task>.from(tasks)));
   }
 }

@@ -28,7 +28,7 @@ class TaskTreeItem extends ConsumerStatefulWidget {
   /// (parentId → children). Pass `const {}` for flat mode (no subtasks shown).
   /// When null, falls back to `task.subtasks` from the API response.
   final Map<int, List<Task>>? subtaskMap;
-  final Future<void> Function(Task task)? onCheckedChanged;
+  final Future<void> Function(Task task, bool done)? onCheckedChanged;
   final Future<bool> Function(Task task, double newPosition)? onSubtaskReorder;
   final int? dragIndex;
 
@@ -234,7 +234,7 @@ class _TaskTreeItemState extends ConsumerState<TaskTreeItem> {
               task: widget.task,
               onTap: () => _onOpen(context),
               onEdit: () => _onEdit(context),
-              onCheckedChanged: (_) => _markAsDone(context),
+              onCheckedChanged: (done) => _markAsDone(context, done),
             ),
           ),
         ],
@@ -260,14 +260,14 @@ class _TaskTreeItemState extends ConsumerState<TaskTreeItem> {
     );
   }
 
-  Future<void> _markAsDone(BuildContext context) async {
+  Future<void> _markAsDone(BuildContext context, bool done) async {
     if (widget.onCheckedChanged != null) {
-      await widget.onCheckedChanged!(widget.task);
+      await widget.onCheckedChanged!(widget.task, done);
       return;
     }
     final success = await ref
         .read(taskPageControllerProvider.notifier)
-        .markAsDone(widget.task);
+        .markAsDone(widget.task, done);
     if (!success && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(AppLocalizations.of(context).taskMarkDoneError)),

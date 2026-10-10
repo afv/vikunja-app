@@ -106,6 +106,32 @@ void main() {
     expect(find.text('No results'), findsOneWidget);
   });
 
+  testWidgets('TaskListPage shows no results for an empty search', (
+    WidgetTester tester,
+  ) async {
+    final model = TaskPageModel([], false, 1, false, searchQuery: 'missing');
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          taskPageControllerProvider.overrideWith(
+            () => MockTaskPageController(model),
+          ),
+        ],
+        child: MaterialApp(
+          home: const TaskListPage(),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: AppLocalizations.supportedLocales,
+          locale: const Locale('en'),
+        ),
+      ),
+    );
+
+    await tester.pump();
+
+    expect(find.text('No results'), findsOneWidget);
+  });
+
   testWidgets(
     'FAB never offers a saved filter, even when it is the default project',
     (WidgetTester tester) async {

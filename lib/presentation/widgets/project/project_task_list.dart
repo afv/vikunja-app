@@ -159,10 +159,10 @@ class ProjectTaskList extends ConsumerWidget {
                   depth: 0,
                   subtaskMap: const {},
                   dragIndex: enableReorder ? index : null,
-                  onCheckedChanged: (t) async {
+                  onCheckedChanged: (t, done) async {
                     final success = await ref
                         .read(projectControllerProvider(project).notifier)
-                        .markAsDone(t);
+                        .markAsDone(t, done);
                     if (!success && ref.context.mounted) {
                       ScaffoldMessenger.of(ref.context).showSnackBar(
                         SnackBar(
@@ -254,10 +254,10 @@ class ProjectTaskList extends ConsumerWidget {
                 depth: 0,
                 subtaskMap: subtaskMap,
                 dragIndex: enableReorder ? index : null,
-                onCheckedChanged: (t) async {
+                onCheckedChanged: (t, done) async {
                   final success = await ref
                       .read(projectControllerProvider(project).notifier)
-                      .markAsDone(t);
+                      .markAsDone(t, done);
                   if (!success && ref.context.mounted) {
                     ScaffoldMessenger.of(ref.context).showSnackBar(
                       SnackBar(

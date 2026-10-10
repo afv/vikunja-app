@@ -3,6 +3,7 @@ import 'package:vikunja_app/domain/entities/task.dart';
 class TaskPageModel {
   List<Task> tasks;
   bool onlyDueDate;
+  bool displayDoneTasks;
   int defaultProjectId;
   bool isLoadingNextPage;
   String searchQuery;
@@ -13,6 +14,7 @@ class TaskPageModel {
     this.onlyDueDate,
     this.defaultProjectId,
     this.isLoadingNextPage, {
+    this.displayDoneTasks = false,
     this.searchQuery = '',
     this.isSearching = false,
   });
@@ -20,6 +22,7 @@ class TaskPageModel {
   TaskPageModel copyWith({
     List<Task>? tasks,
     bool? onlyDueDate,
+    bool? displayDoneTasks,
     int? defaultProjectId,
     bool? isLoadingNextPage,
     String? searchQuery,
@@ -30,6 +33,7 @@ class TaskPageModel {
       onlyDueDate ?? this.onlyDueDate,
       defaultProjectId ?? this.defaultProjectId,
       isLoadingNextPage ?? this.isLoadingNextPage,
+      displayDoneTasks: displayDoneTasks ?? this.displayDoneTasks,
       searchQuery: searchQuery ?? this.searchQuery,
       isSearching: isSearching ?? this.isSearching,
     );

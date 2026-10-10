@@ -243,6 +243,33 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
                   ),
                 ),
               ),
+              PopupMenuItem(
+                child: InkWell(
+                  onTap: () {
+                    _displayDoneTasksChanged(
+                      ref,
+                      context,
+                      !model.displayDoneTasks,
+                    );
+                  },
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
+                    children: [
+                      Text(AppLocalizations.of(context).showDoneTasks),
+                      Checkbox(
+                        value: model.displayDoneTasks,
+                        onChanged: (bool? value) {
+                          _displayDoneTasksChanged(
+                            ref,
+                            context,
+                            !model.displayDoneTasks,
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ];
           },
         ),
@@ -255,6 +282,17 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
     ref
         .read(taskPageControllerProvider.notifier)
         .setLandingPageOnlyDueDateTasks(newValue);
+  }
+
+  void _displayDoneTasksChanged(
+    WidgetRef ref,
+    BuildContext context,
+    bool newValue,
+  ) {
+    Navigator.pop(context);
+    ref
+        .read(taskPageControllerProvider.notifier)
+        .setLandingPageDisplayDoneTasks(newValue);
   }
 
   void _addItemDialog(
