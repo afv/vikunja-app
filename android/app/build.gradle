@@ -46,7 +46,8 @@ android {
     }
 
     defaultConfig {
-        applicationId "io.vikunja.app"
+        // Fork: own application id, so it installs alongside the Play Store app.
+        applicationId "pt.afv.vikunja"
         minSdkVersion flutter.minSdkVersion
         targetSdk flutter.targetSdkVersion
         testInstrumentationRunner "android.support.test.runner.AndroidJUnitRunner"
@@ -56,10 +57,14 @@ android {
 
     signingConfigs {
         release {
-            keyAlias keystoreProperties['keyAlias']
-            keyPassword keystoreProperties['keyPassword']
-            storeFile keystoreProperties['storeFile'] ? file(keystoreProperties['storeFile']) : null
-            storePassword keystoreProperties['storePassword']
+            // Fork: without key.properties, read the signing key from the environment
+            // (KEYSTORE_PATH, KEYSTORE_PASSWORD, KEYSTORE_ALIAS, KEYSTORE_ALIAS_PASSWORD).
+            def env = System.getenv()
+            keyAlias keystoreProperties['keyAlias'] ?: env['KEYSTORE_ALIAS']
+            keyPassword keystoreProperties['keyPassword'] ?: env['KEYSTORE_ALIAS_PASSWORD']
+            def storePath = keystoreProperties['storeFile'] ?: env['KEYSTORE_PATH']
+            storeFile storePath ? file(storePath) : null
+            storePassword keystoreProperties['storePassword'] ?: env['KEYSTORE_PASSWORD']
         }
     }
 
