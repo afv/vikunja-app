@@ -4,7 +4,7 @@ import 'package:flutter_spinkit/flutter_spinkit.dart';
 import 'package:vikunja_app/core/di/hierarchical_display_provider.dart';
 import 'package:vikunja_app/core/di/network_provider.dart';
 import 'package:vikunja_app/core/di/repository_provider.dart';
-import 'package:vikunja_app/core/utils/calculate_item_position.dart';
+import 'package:vikunja_app/domain/entities/project.dart';
 import 'package:vikunja_app/domain/entities/task.dart';
 import 'package:vikunja_app/domain/entities/task_page_model.dart';
 import 'package:vikunja_app/l10n/gen/app_localizations.dart';
@@ -14,7 +14,6 @@ import 'package:vikunja_app/presentation/pages/loading_widget.dart';
 import 'package:vikunja_app/presentation/widgets/empty_view.dart';
 import 'package:vikunja_app/presentation/widgets/searchable_app_bar.dart';
 import 'package:vikunja_app/presentation/widgets/task/add_task_dialog.dart';
-import 'package:vikunja_app/presentation/widgets/task/task_list_item.dart';
 import 'package:vikunja_app/presentation/widgets/task/task_tree_item.dart';
 
 class TaskListPage extends ConsumerStatefulWidget {
@@ -50,14 +49,18 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
             ),
           ),
           floatingActionButton: FloatingActionButton(
-            onPressed: () {
-              if (model.defaultProjectId <= 0) {
+            onPressed: () async {
+              final projects = await _loadProjects(ref);
+              if (!context.mounted) {
+                return;
+              }
+              if (projects.isEmpty) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text(l10n.selectDefaultProject)),
                 );
-              } else {
-                _addItemDialog(ref, context, model.defaultProjectId);
+                return;
               }
+              _addItemDialog(ref, context, model.defaultProjectId, projects);
             },
             child: const Icon(Icons.add),
           ),
@@ -258,14 +261,38 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
     WidgetRef ref,
     BuildContext context,
     int defaultProjectId,
+    List<Project> projects,
   ) {
+    final projectId = projects.any((project) => project.id == defaultProjectId)
+        ? defaultProjectId
+        : projects.first.id;
     showDialog(
       context: context,
       builder: (_) => AddTaskDialog(
-        onAddTask: (title, dueDate) =>
-            _addTask(ref, title, dueDate, defaultProjectId),
+        initialProjectId: projectId,
+        projects: projects,
+        onAddTask: (title, dueDate, selectedProjectId, priority) => _addTask(
+          ref,
+          title,
+          dueDate,
+          selectedProjectId ?? projectId,
+          priority,
+        ),
       ),
     );
+  }
+
+  Future<List<Project>> _loadProjects(WidgetRef ref) async {
+    final response = await ref.read(projectRepositoryProvider).getAll();
+    if (response.isSuccessful) {
+      // Saved filters are listed as pseudo-projects with ids <= 0; never offer them (#318).
+      return response
+          .toSuccess()
+          .body
+          .where((project) => project.id > 0)
+          .toList();
+    }
+    return [];
   }
 
   Future<void> _addTask(
@@ -273,6 +300,7 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
     String title,
     DateTime? dueDate,
     int defaultProjectId,
+    int priority,
   ) async {
     final currentUser = ref.read(currentUserProvider);
     if (currentUser == null) {
@@ -284,6 +312,7 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
       dueDate: dueDate,
       createdBy: currentUser,
       projectId: defaultProjectId,
+      priority: priority,
     );
 
     var success = await ref

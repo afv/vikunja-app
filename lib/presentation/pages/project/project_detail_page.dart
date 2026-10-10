@@ -183,8 +183,16 @@ class ProjectPageState extends ConsumerState<ProjectDetailPage> {
     return showDialog(
       context: context,
       builder: (_) => AddTaskDialog(
-        onAddTask: (title, dueDate) =>
-            _addItem(context, project, title, dueDate),
+        initialProjectId: project.id,
+        projects: [project],
+        onAddTask: (title, dueDate, selectedProjectId, priority) => _addItem(
+          context,
+          project,
+          title,
+          dueDate,
+          selectedProjectId ?? project.id,
+          priority,
+        ),
       ),
     );
   }
@@ -194,6 +202,8 @@ class ProjectPageState extends ConsumerState<ProjectDetailPage> {
     Project project,
     String title,
     DateTime? dueDate,
+    int projectId,
+    int priority,
   ) async {
     final currentUser = ref.read(currentUserProvider);
     if (currentUser == null) {
@@ -205,7 +215,8 @@ class ProjectPageState extends ConsumerState<ProjectDetailPage> {
       dueDate: dueDate,
       createdBy: currentUser,
       done: false,
-      projectId: project.id,
+      projectId: projectId,
+      priority: priority,
     );
 
     var success = await ref

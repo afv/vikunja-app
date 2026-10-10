@@ -11,9 +11,8 @@ void main() {
 
     var updaterCalled = false;
     final future = pagination.loadMoreItems(
-      fetcher: (page) async => SuccessResponse([page], 200, {
-        'x-pagination-total-pages': '3',
-      }),
+      fetcher: (page) async =>
+          SuccessResponse([page], 200, {'x-pagination-total-pages': '3'}),
       shouldApply: () => false,
       stateUpdater: (_) {
         updaterCalled = true;

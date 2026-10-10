@@ -1,12 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vikunja_app/core/di/repository_provider.dart';
+import 'package:vikunja_app/core/network/response.dart';
 import 'package:vikunja_app/domain/entities/project.dart';
 import 'package:vikunja_app/domain/entities/task.dart';
 import 'package:vikunja_app/domain/entities/task_page_model.dart';
 import 'package:vikunja_app/domain/entities/user.dart';
+import 'package:vikunja_app/domain/repositories/project_repository.dart';
 import 'package:vikunja_app/presentation/manager/task_page_controller.dart';
 import 'package:vikunja_app/presentation/pages/task/task_list_page.dart';
+import 'package:vikunja_app/presentation/widgets/task/add_task_dialog.dart';
 import 'package:vikunja_app/l10n/gen/app_localizations.dart';
 
 class MockTaskPageController extends TaskPageController {
@@ -15,6 +19,17 @@ class MockTaskPageController extends TaskPageController {
 
   @override
   Future<TaskPageModel> build() async => model;
+}
+
+class FakeProjectRepository extends Fake implements ProjectRepository {
+  final List<Project> projects;
+  FakeProjectRepository(this.projects);
+
+  @override
+  Future<Response<List<Project>>> getAll({
+    int page = 1,
+    String? search,
+  }) async => SuccessResponse(projects, 200, {});
 }
 
 void main() {
@@ -92,15 +107,21 @@ void main() {
   });
 
   testWidgets(
-    'FAB shows hint instead of add dialog when default project is a saved filter',
+    'FAB never offers a saved filter, even when it is the default project',
     (WidgetTester tester) async {
+      // Default project id -5 is a saved filter (a pseudo-project).
       final model = TaskPageModel([], false, -5, false);
+      final savedFilter = Project(id: -5, title: 'My filter');
+      final realProject = Project(id: 3, title: 'Inbox');
 
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
             taskPageControllerProvider.overrideWith(
               () => MockTaskPageController(model),
+            ),
+            projectRepositoryProvider.overrideWithValue(
+              FakeProjectRepository([savedFilter, realProject]),
             ),
           ],
           child: MaterialApp(
@@ -113,15 +134,12 @@ void main() {
       );
 
       await tester.pump();
-
       await tester.tap(find.byType(FloatingActionButton));
-      await tester.pump();
+      await tester.pumpAndSettle();
 
-      expect(
-        find.text('Please select a default project in the settings'),
-        findsOneWidget,
-      );
-      expect(find.byType(Dialog), findsNothing);
+      final dialog = tester.widget<AddTaskDialog>(find.byType(AddTaskDialog));
+      expect(dialog.initialProjectId, 3);
+      expect(dialog.projects.map((p) => p.id), [3]);
     },
   );
 }
