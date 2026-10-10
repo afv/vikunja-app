@@ -4,9 +4,9 @@ import 'package:vikunja_app/core/utils/calculate_item_position.dart';
 import 'package:vikunja_app/domain/entities/task.dart';
 import 'package:vikunja_app/l10n/gen/app_localizations.dart';
 import 'package:vikunja_app/presentation/manager/task_page_controller.dart';
+import 'package:vikunja_app/presentation/pages/task/task_detail_page.dart';
 import 'package:vikunja_app/presentation/pages/task/task_edit_page.dart';
 import 'package:vikunja_app/presentation/widgets/task/task_list_item.dart';
-import 'package:vikunja_app/presentation/widgets/task_bottom_sheet.dart';
 
 /// Renders a [task] and its subtasks recursively in a tree layout.
 ///
@@ -232,7 +232,7 @@ class _TaskTreeItemState extends ConsumerState<TaskTreeItem> {
             child: TaskListItem(
               key: Key('task_item_${widget.task.id}'),
               task: widget.task,
-              onTap: () => _showTaskBottomSheet(context),
+              onTap: () => _onOpen(context),
               onEdit: () => _onEdit(context),
               onCheckedChanged: (_) => _markAsDone(context),
             ),
@@ -242,18 +242,12 @@ class _TaskTreeItemState extends ConsumerState<TaskTreeItem> {
     );
   }
 
-  void _showTaskBottomSheet(BuildContext context) {
-    showModalBottomSheet<void>(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(10.0)),
+  void _onOpen(BuildContext context) {
+    Navigator.push<Task?>(
+      context,
+      MaterialPageRoute(
+        builder: (buildContext) => TaskDetailPage(task: widget.task),
       ),
-      builder: (BuildContext context) {
-        return TaskBottomSheet(
-          task: widget.task,
-          onEdit: () => _onEdit(context),
-        );
-      },
     );
   }
 
