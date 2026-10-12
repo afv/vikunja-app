@@ -272,5 +272,9 @@
   "attachmentUploadFailed": "Could not upload the attachment",
   "attachmentFailed": "Could not open the attachment",
   "openLinkFailed": "Could not open the link",
-  "openInBrowser": "Open in browser"
+  "openInBrowser": "Open in browser",
+  "savedFiltersTitle": "Filters",
+  "@savedFiltersTitle": {
+    "description": "Header above saved filters in the projects list"
+  }
 }

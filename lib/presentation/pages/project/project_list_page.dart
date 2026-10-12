@@ -14,7 +14,11 @@ import 'package:vikunja_app/presentation/widgets/project/add_project_dialog.dart
 import 'package:vikunja_app/presentation/widgets/searchable_app_bar.dart';
 
 class ProjectListPage extends ConsumerWidget {
-  const ProjectListPage({super.key});
+  /// Saved filters come from the API as pseudo-projects with negative ids. The Projects tab hides them; the
+  /// Filters tab (filters: true) shows only them.
+  final bool filters;
+
+  const ProjectListPage({super.key, this.filters = false});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -22,7 +26,9 @@ class ProjectListPage extends ConsumerWidget {
 
     return controller.when(
       data: (model) {
-        final projects = model.projects;
+        final projects = model.projects
+            .where((p) => filters ? p.id < 0 : p.id >= 0)
+            .toList();
         final itemCount = projects.length + (model.isLoadingNextPage ? 1 : 0);
         return Scaffold(
           body: NotificationListener<ScrollNotification>(
@@ -81,7 +87,9 @@ class ProjectListPage extends ConsumerWidget {
             ),
           ),
           appBar: SearchableAppBar(
-            title: AppLocalizations.of(context).projectsTitle,
+            title: filters
+                ? AppLocalizations.of(context).savedFiltersTitle
+                : AppLocalizations.of(context).projectsTitle,
             searchHint: AppLocalizations.of(context).searchProjectsHint,
             searchQuery: model.searchQuery,
             showProgress: model.isSearching,
@@ -91,11 +99,12 @@ class ProjectListPage extends ConsumerWidget {
                   .setSearchQuery(query);
             },
             actions: [
-              IconButton(
-                icon: const Icon(Icons.add),
-                tooltip: AppLocalizations.of(context).add,
-                onPressed: () => _addProjectDialog(ref),
-              ),
+              if (!filters)
+                IconButton(
+                  icon: const Icon(Icons.add),
+                  tooltip: AppLocalizations.of(context).add,
+                  onPressed: () => _addProjectDialog(ref),
+                ),
             ],
           ),
         );
@@ -115,7 +124,7 @@ class ProjectListPage extends ConsumerWidget {
   }) {
     if (flattenSubprojects || project.subprojects.isEmpty == true) {
       return ListTile(
-        leading: Icon(Icons.list),
+        leading: Icon(filters ? Icons.filter_alt_outlined : Icons.list),
         title: Text(project.title),
         onTap: () {
           _navigateToProject(ref, project);
