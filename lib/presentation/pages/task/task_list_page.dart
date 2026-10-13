@@ -1,3 +1,4 @@
+import 'package:vikunja_app/core/utils/search_match.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
@@ -94,6 +95,10 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
       );
     }
 
+    if (model.searchQuery.isNotEmpty) {
+      return _buildSearchList(ref, context, model);
+    }
+
     final hierarchical =
         ref.watch(hierarchicalDisplayProvider).valueOrNull ?? false;
 
@@ -101,6 +106,70 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
       return _buildFlatList(context, model);
     }
     return _buildHierarchicalList(ref, context, model);
+  }
+
+  /// Search results: tasks whose title has every word first; those that match only in the description come after
+  /// a header with a switch (off by default — descriptions often repeat a checklist and add noise).
+  Widget _buildSearchList(
+    WidgetRef ref,
+    BuildContext context,
+    TaskPageModel model,
+  ) {
+    final inTitle = <Task>[];
+    final onlyInDescription = <Task>[];
+    for (final task in model.tasks) {
+      (matchesAllWords(task.title, model.searchQuery)
+              ? inTitle
+              : onlyInDescription)
+          .add(task);
+    }
+    final showDescriptions = ref.watch(searchDescriptionsProvider);
+    final entries = <Object>[
+      ...inTitle,
+      if (onlyInDescription.isNotEmpty)
+        _DescriptionHeader(onlyInDescription.length),
+      if (showDescriptions) ...onlyInDescription,
+    ];
+    final itemCount = entries.length + (model.isLoadingNextPage ? 1 : 0);
+    return ListView.separated(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.manual,
+      physics: const AlwaysScrollableScrollPhysics(),
+      itemCount: itemCount,
+      separatorBuilder: (_, _) => const Divider(height: 8),
+      itemBuilder: (context, index) {
+        if (index == entries.length) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 16.0),
+            child: Center(
+              child: SpinKitThreeBounce(
+                color: Theme.of(context).primaryColor,
+                size: 16,
+              ),
+            ),
+          );
+        }
+        final entry = entries[index];
+        if (entry is _DescriptionHeader) {
+          return SwitchListTile(
+            dense: true,
+            title: Text(
+              '${AppLocalizations.of(context).searchOnlyInDescription} (${entry.count})',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+            value: showDescriptions,
+            onChanged: (value) =>
+                ref.read(searchDescriptionsProvider.notifier).state = value,
+          );
+        }
+        final task = entry as Task;
+        return TaskTreeItem(
+          key: Key('search_${task.id}'),
+          task: task,
+          depth: 0,
+          subtaskMap: const {},
+        );
+      },
+    );
   }
 
   Widget _buildFlatList(BuildContext context, TaskPageModel model) {
@@ -373,4 +442,13 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
       }
     }
   }
+}
+
+/// Whether search results that match only in the description are shown (off by default).
+final searchDescriptionsProvider = StateProvider<bool>((ref) => false);
+
+class _DescriptionHeader {
+  final int count;
+
+  const _DescriptionHeader(this.count);
 }

@@ -276,5 +276,9 @@
   "savedFiltersTitle": "Filters",
   "@savedFiltersTitle": {
     "description": "Header above saved filters in the projects list"
+  },
+  "searchOnlyInDescription": "Only in the description",
+  "@searchOnlyInDescription": {
+    "description": "Header of the search results that match only in the task description"
   }
 }
