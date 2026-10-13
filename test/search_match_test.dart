@@ -23,4 +23,17 @@ void main() {
     expect(matchesAllWords('Test notification', 'test xyz'), isFalse);
     expect(matchesAllWords('Test notification', '   '), isFalse);
   });
+
+  test('task references: id, #index and identifier', () {
+    expect(matchesTaskReference(208, 'REP-9', '208'), isTrue);
+    expect(matchesTaskReference(208, 'REP-9', '#208'), isTrue);
+    expect(matchesTaskReference(208, 'REP-9', '#9'), isTrue);
+    expect(matchesTaskReference(208, '#9', '#9'), isTrue);
+    expect(matchesTaskReference(208, 'REP-9', 'rep-9'), isTrue);
+    expect(matchesTaskReference(208, 'REP-9', ' REP-9 '), isTrue);
+    expect(matchesTaskReference(208, 'REP-9', '9'), isFalse);
+    expect(matchesTaskReference(208, 'REP-9', 'REP-19'), isFalse);
+    expect(matchesTaskReference(208, 'REP-9', 'CASA-9'), isFalse);
+    expect(matchesTaskReference(208, 'REP-9', 'abrigo 208'), isFalse);
+  });
 }

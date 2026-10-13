@@ -108,7 +108,7 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
     return _buildHierarchicalList(ref, context, model);
   }
 
-  /// Search results: tasks whose title has every word first; those that match only in the description come after
+  /// Search results: tasks whose title has every word (or that the query names by id, e.g. "208" or "REP-9") first; those that match only in the description come after
   /// a header with a switch (off by default — descriptions often repeat a checklist and add noise).
   Widget _buildSearchList(
     WidgetRef ref,
@@ -118,7 +118,12 @@ class _TaskListPageState extends ConsumerState<TaskListPage> {
     final inTitle = <Task>[];
     final onlyInDescription = <Task>[];
     for (final task in model.tasks) {
-      (matchesAllWords(task.title, model.searchQuery)
+      (matchesAllWords(task.title, model.searchQuery) ||
+                  matchesTaskReference(
+                    task.id,
+                    task.identifier,
+                    model.searchQuery,
+                  )
               ? inTitle
               : onlyInDescription)
           .add(task);
