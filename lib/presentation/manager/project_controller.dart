@@ -306,9 +306,9 @@ class ProjectController extends _$ProjectController with PaginationMixin<Task> {
     if (!displayDoneTasks) {
       filterParts.add('done=false');
     }
-    final searchClause = searchLikeClause(query);
-    if (searchClause != null) {
-      filterParts.add(searchClause);
+    // `s` is the server's search (ILIKE: case-insensitive); a `title like` filter is case-sensitive on Postgres
+    if (query.trim().isNotEmpty) {
+      queryParams['s'] = [query.trim()];
     }
     if (filterParts.isNotEmpty) {
       queryParams['filter'] = [combineFilterClauses(filterParts)];

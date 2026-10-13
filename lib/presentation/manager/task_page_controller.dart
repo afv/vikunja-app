@@ -190,9 +190,9 @@ class TaskPageController extends _$TaskPageController
           "order_by": ["asc", "desc"],
           "page": ["$page"],
         };
-        final searchClause = searchLikeClause(query);
-        if (searchClause != null) {
-          queryParameters["filter"] = [searchClause];
+        // `s` is the server's search (ILIKE: case-insensitive); a `title like` filter is case-sensitive on Postgres
+        if (query.trim().isNotEmpty) {
+          queryParameters["s"] = [query.trim()];
         }
 
         var tasksResponse = await ref
@@ -210,10 +210,6 @@ class TaskPageController extends _$TaskPageController
     if (showOnlyDueDateTasks) {
       filterStrings.add("due_date > 0001-01-01 00:00");
     }
-    final searchClause = searchLikeClause(query);
-    if (searchClause != null) {
-      filterStrings.add(searchClause);
-    }
 
     var tasksResponse = await ref
         .read(taskRepositoryProvider)
@@ -221,6 +217,7 @@ class TaskPageController extends _$TaskPageController
           "sort_by": ["due_date", "id"],
           "order_by": ["asc", "desc"],
           "filter_include_nulls": ["false"],
+          if (query.trim().isNotEmpty) "s": [query.trim()],
           "page": ["$page"],
         });
 
