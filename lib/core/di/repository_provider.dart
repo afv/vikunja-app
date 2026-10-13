@@ -1,10 +1,12 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:vikunja_app/core/di/data_source_provider.dart';
+import 'package:vikunja_app/core/di/notification_provider.dart';
 import 'package:vikunja_app/data/repositories/bucket_repository_impl.dart';
 import 'package:vikunja_app/data/repositories/label_repository_impl.dart';
 import 'package:vikunja_app/data/repositories/project_repository_impl.dart';
 import 'package:vikunja_app/data/repositories/project_view_repository_impl.dart';
+import 'package:vikunja_app/data/repositories/rescheduling_task_repository.dart';
 import 'package:vikunja_app/data/repositories/server_repository_impl.dart';
 import 'package:vikunja_app/data/repositories/settings_repository_impl.dart';
 import 'package:vikunja_app/data/repositories/task_comment_repository_impl.dart';
@@ -47,7 +49,13 @@ BucketRepository bucketRepository(Ref ref) {
 @riverpod
 TaskRepository taskRepository(Ref ref) {
   var taskDataSource = ref.watch(taskDataSourceProvider);
-  return TaskRepositoryImpl(taskDataSource);
+  final repository = TaskRepositoryImpl(taskDataSource);
+  // reschedule local notifications as soon as a task changes (otherwise only at the next refresh)
+  return ReschedulingTaskRepository(
+    repository,
+    onChanged: () =>
+        ref.read(notificationProvider)?.scheduleDueNotifications(repository),
+  );
 }
 
 @riverpod

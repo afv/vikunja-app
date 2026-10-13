@@ -11,6 +11,7 @@ import 'package:vikunja_app/core/network/client.dart';
 import 'package:vikunja_app/data/data_sources/settings_data_source.dart';
 import 'package:vikunja_app/data/data_sources/task_data_source.dart';
 import 'package:vikunja_app/data/repositories/task_repository_impl.dart';
+import 'package:vikunja_app/domain/entities/task.dart';
 import 'package:vikunja_app/domain/repositories/task_repository.dart';
 import 'package:vikunja_app/presentation/manager/widget_controller.dart';
 
@@ -226,19 +227,47 @@ class NotificationHandler {
         ?.requestPermissions(alert: true, badge: true, sound: true);
   }
 
-  Future<void> scheduleDueNotifications(TaskRepository taskService) async {
-    var taskResponse = await taskService.getByFilterString(
-      "done=false && (due_date > now || reminders > now)",
-      {
-        "filter_include_nulls": ["false"],
-      },
-    );
+  /// How far ahead notifications are scheduled. Android allows an app only ~500 pending alarms, so not every
+  /// future due date can be scheduled at once; the periodic background refresh moves the window forward.
+  static const scheduleWindow = Duration(days: 14);
+  static const maxScheduled = 400;
+  static const _pageSize = 50; // the server's default maximum page size
 
-    if (taskResponse.isSuccessful) {
+  Future<void> scheduleDueNotifications(TaskRepository taskService) async {
+    // All pages, soonest first. One request used to return only the first page (50 tasks), so with more tasks
+    // most due dates and reminders were never scheduled.
+    final tasks = <Task>[];
+    for (var page = 1; page <= 20; page++) {
+      final response = await taskService.getByFilterString(
+        "done = false && ((due_date > now && due_date < now+14d) || "
+        "(reminders > now && reminders < now+14d))",
+        {
+          "filter_include_nulls": ["false"],
+          "sort_by": ["due_date", "id"],
+          "order_by": ["asc", "asc"],
+          "page": ["$page"],
+          "per_page": ["$_pageSize"],
+        },
+      );
+      if (!response.isSuccessful) {
+        developer.log("could not load tasks for notifications");
+        return; // keep the alarms already scheduled
+      }
+      final batch = response.toSuccess().body;
+      tasks.addAll(batch);
+      if (batch.length < _pageSize) break;
+    }
+
+    final limit = DateTime.now().add(scheduleWindow);
+    var scheduled = 0;
+    {
       await notificationsPlugin.cancelAll();
-      for (final task in taskResponse.toSuccess().body) {
+      for (final task in tasks) {
+        if (scheduled >= maxScheduled) break;
         if (task.done) continue;
         for (final reminder in task.reminderDates) {
+          if (reminder.reminder.isAfter(limit)) continue;
+          scheduled++;
           await scheduleNotification(
             (reminder.reminder.millisecondsSinceEpoch / 1000).floor(),
             "Reminder",
@@ -249,7 +278,8 @@ class NotificationHandler {
             platformChannelSpecificsReminders,
           );
         }
-        if (task.hasDueDate) {
+        if (task.hasDueDate && !task.dueDate!.isAfter(limit)) {
+          scheduled++;
           await scheduleNotification(
             task.id,
             "Due Reminder",
@@ -261,7 +291,9 @@ class NotificationHandler {
           );
         }
       }
-      developer.log("notifications scheduled successfully");
+      developer.log(
+        "notifications scheduled: $scheduled (from ${tasks.length} tasks)",
+      );
     }
   }
 
