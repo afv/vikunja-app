@@ -35,6 +35,10 @@ class TaskRepositoryImpl extends TaskRepository {
   }
 
   @override
+  Future<Response<List<String>>> getBucketTitles(int id) =>
+      _dataSource.getBucketTitles(id);
+
+  @override
   Future<Response<Task>> getTask(int id) async {
     return (await _dataSource.getTask(id)).toDomain();
   }

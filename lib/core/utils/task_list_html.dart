@@ -39,6 +39,14 @@ String taskItemContentHtml(dom.Element item) {
   return clone.innerHtml;
 }
 
+/// (ticked, total) checkbox items in [description].
+(int, int) countTaskItems(String description) {
+  final items = html_parser
+      .parseFragment(description)
+      .querySelectorAll(_itemSelector);
+  return (items.where(isTaskItemChecked).length, items.length);
+}
+
 /// [description] with checkbox item number [index] set to [checked]; unchanged if there is no such item.
 String setTaskItemChecked(String description, int index, bool checked) {
   final fragment = html_parser.parseFragment(description);

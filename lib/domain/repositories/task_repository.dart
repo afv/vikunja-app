@@ -15,6 +15,8 @@ abstract class TaskRepository {
 
   Future<Response<Task>> getTask(int id);
 
+  Future<Response<List<String>>> getBucketTitles(int id);
+
   Future<Response<List<Task>>> getAllByProject(
     int projectId, [
     Map<String, List<String>>? queryParameters,

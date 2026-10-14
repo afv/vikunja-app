@@ -48,6 +48,10 @@ class ReschedulingTaskRepository implements TaskRepository {
   Future<Response<Task>> getTask(int id) => _inner.getTask(id);
 
   @override
+  Future<Response<List<String>>> getBucketTitles(int id) =>
+      _inner.getBucketTitles(id);
+
+  @override
   Future<Response<List<Task>>> getAllByProject(
     int projectId, [
     Map<String, List<String>>? queryParameters,

@@ -46,6 +46,24 @@ class TaskDataSource extends RemoteDataSource {
     );
   }
 
+  /// Titles of the kanban columns the task sits in (one per kanban view).
+  Future<Response<List<String>>> getBucketTitles(int taskId) async {
+    return await client.get(
+      url: '/tasks/$taskId',
+      queryParameters: {
+        'expand': ['buckets'],
+      },
+      mapper: (body) {
+        final buckets = (body['buckets'] as List?) ?? const [];
+        return [
+          for (final b in buckets)
+            if (b is Map && (b['title'] as String?)?.isNotEmpty == true)
+              b['title'] as String,
+        ];
+      },
+    );
+  }
+
   Future<Response<TaskDto>> getTask(int taskId) async {
     return await client.get(
       url: '/tasks/$taskId',

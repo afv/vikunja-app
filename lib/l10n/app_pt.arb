@@ -1,4 +1,5 @@
 {
   "savedFiltersTitle": "Filtros",
-  "searchOnlyInDescription": "Só na descrição"
+  "searchOnlyInDescription": "Só na descrição",
+  "checklistProgress": "{done} de {total} tarefas"
 }

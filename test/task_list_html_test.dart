@@ -43,4 +43,9 @@ void main() {
     expect(setTaskItemChecked(_list, 5, true), _list);
     expect(setTaskItemChecked('<p>no list</p>', 0, true), '<p>no list</p>');
   });
+
+  test('counts ticked and total items', () {
+    expect(countTaskItems(_list), (1, 2));
+    expect(countTaskItems('<p>none</p>'), (0, 0));
+  });
 }

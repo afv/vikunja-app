@@ -28,7 +28,7 @@ class TaskDetailPage extends ConsumerStatefulWidget {
 
 class _TaskDetailPageState extends ConsumerState<TaskDetailPage> {
   Task? _task;
-  String? _projectTitle;
+  List<String> _breadcrumb = [];
   bool _uploading = false;
 
   @override
@@ -45,16 +45,32 @@ class _TaskDetailPageState extends ConsumerState<TaskDetailPage> {
     if (!mounted) return;
     if (response.isSuccessful) {
       setState(() => _task = response.toSuccess().body);
-      _loadProjectTitle();
+      _loadBreadcrumb();
     }
   }
 
-  Future<void> _loadProjectTitle() async {
-    final projectId = _task?.projectId;
-    if (projectId == null || _projectTitle != null) return;
-    final response = await ref.read(projectRepositoryProvider).get(projectId);
-    if (!mounted || !response.isSuccessful) return;
-    setState(() => _projectTitle = response.toSuccess().body.title);
+  /// «🏠 Casa — Porto › 🪴 Plantas › 📋 A fazer», as on the web: the board's parents, the board, the column.
+  Future<void> _loadBreadcrumb() async {
+    final task = _task;
+    if (task == null || task.projectId == null) return;
+    final projects = ref.read(projectRepositoryProvider);
+    final titles = <String>[];
+    var projectId = task.projectId!;
+    for (var depth = 0; projectId > 0 && depth < 6; depth++) {
+      final response = await projects.get(projectId);
+      if (!response.isSuccessful) break;
+      final project = response.toSuccess().body;
+      titles.insert(0, project.title);
+      projectId = project.parentProjectId;
+    }
+    final buckets = await ref
+        .read(taskRepositoryProvider)
+        .getBucketTitles(task.id);
+    if (buckets.isSuccessful && buckets.toSuccess().body.isNotEmpty) {
+      titles.add(buckets.toSuccess().body.first);
+    }
+    if (!mounted) return;
+    setState(() => _breadcrumb = titles);
   }
 
   Future<void> _uploadAttachment() async {
@@ -144,12 +160,15 @@ class _TaskDetailPageState extends ConsumerState<TaskDetailPage> {
     );
   }
 
-  /// «REP-16 · 🔧 Reparar & Projectos»: the card's id and its board, which the title alone doesn't tell.
+  /// «PLA-9 · 1 of 7 tasks»: the card's id and, if it has checkboxes, how many are ticked.
   String _subtitle(Task task) {
     final parts = <String>[
       if (task.identifier.isNotEmpty) task.identifier else '#${task.id}',
     ];
-    if (_projectTitle != null) parts.add(_projectTitle!);
+    final (done, total) = countTaskItems(task.description);
+    if (total > 0) {
+      parts.add(AppLocalizations.of(context).checklistProgress(done, total));
+    }
     return parts.join(' · ');
   }
 
@@ -223,6 +242,13 @@ class _TaskDetailPageState extends ConsumerState<TaskDetailPage> {
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
+              if (_breadcrumb.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  _breadcrumb.join('  ›  '),
+                  style: theme.textTheme.bodyMedium,
+                ),
+              ],
               if (task.labels.isNotEmpty) ...[
                 const SizedBox(height: 8),
                 Wrap(

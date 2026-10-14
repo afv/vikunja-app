@@ -280,5 +280,13 @@
   "searchOnlyInDescription": "Only in the description",
   "@searchOnlyInDescription": {
     "description": "Header of the search results that match only in the task description"
+  },
+  "checklistProgress": "{done} of {total} tasks",
+  "@checklistProgress": {
+    "description": "Ticked and total checkboxes in a task description",
+    "placeholders": {
+      "done": {"type": "int"},
+      "total": {"type": "int"}
+    }
   }
 }
