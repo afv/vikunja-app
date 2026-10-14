@@ -11,7 +11,6 @@ import 'package:vikunja_app/domain/entities/task.dart';
 import 'package:vikunja_app/domain/entities/task_attachment.dart';
 import 'package:vikunja_app/domain/entities/task_reminder.dart';
 import 'package:vikunja_app/l10n/gen/app_localizations.dart';
-import 'package:vikunja_app/presentation/manager/projects_controller.dart';
 import 'package:vikunja_app/presentation/pages/task/task_edit_page.dart';
 import 'package:vikunja_app/presentation/utils/attachment_utils.dart';
 import 'package:vikunja_app/presentation/utils/html_linkify.dart';
@@ -29,6 +28,7 @@ class TaskDetailPage extends ConsumerStatefulWidget {
 
 class _TaskDetailPageState extends ConsumerState<TaskDetailPage> {
   Task? _task;
+  String? _projectTitle;
   bool _uploading = false;
 
   @override
@@ -45,7 +45,16 @@ class _TaskDetailPageState extends ConsumerState<TaskDetailPage> {
     if (!mounted) return;
     if (response.isSuccessful) {
       setState(() => _task = response.toSuccess().body);
+      _loadProjectTitle();
     }
+  }
+
+  Future<void> _loadProjectTitle() async {
+    final projectId = _task?.projectId;
+    if (projectId == null || _projectTitle != null) return;
+    final response = await ref.read(projectRepositoryProvider).get(projectId);
+    if (!mounted || !response.isSuccessful) return;
+    setState(() => _projectTitle = response.toSuccess().body.title);
   }
 
   Future<void> _uploadAttachment() async {
@@ -140,14 +149,7 @@ class _TaskDetailPageState extends ConsumerState<TaskDetailPage> {
     final parts = <String>[
       if (task.identifier.isNotEmpty) task.identifier else '#${task.id}',
     ];
-    final projects =
-        ref.watch(projectsControllerProvider).valueOrNull?.projects ?? [];
-    for (final project in projects) {
-      if (project.id == task.projectId) {
-        parts.add(project.title);
-        break;
-      }
-    }
+    if (_projectTitle != null) parts.add(_projectTitle!);
     return parts.join(' · ');
   }
 
