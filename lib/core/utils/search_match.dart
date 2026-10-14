@@ -75,7 +75,7 @@ bool matchesAllWords(String text, String query) {
 }
 
 /// True when [query] names the task by number, mirroring the server: "208" or "#208" is the task id, "#9" is also
-/// the task's number in its project, and "REP-9" (any case) is its identifier.
+/// the task's number in its project, "REP-9" (any case) is its identifier, and "REP-" names every task of REP.
 bool matchesTaskReference(int id, String identifier, String query) {
   final q = query.trim().toUpperCase();
   final number = RegExp(r'^#?(\d+)$').firstMatch(q);
@@ -86,6 +86,7 @@ bool matchesTaskReference(int id, String identifier, String query) {
     final ident = identifier.toUpperCase();
     return ident == '#$n' || ident.endsWith('-$n');
   }
-  return RegExp(r'^[\p{L}\p{N}]+-\d+$', unicode: true).hasMatch(q) &&
-      identifier.toUpperCase() == q;
+  if (!RegExp(r'^[\p{L}\p{N}]+-\d*$', unicode: true).hasMatch(q)) return false;
+  final ident = identifier.toUpperCase();
+  return q.endsWith('-') ? ident.startsWith(q) : ident == q;
 }

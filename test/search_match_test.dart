@@ -35,5 +35,7 @@ void main() {
     expect(matchesTaskReference(208, 'REP-9', 'REP-19'), isFalse);
     expect(matchesTaskReference(208, 'REP-9', 'CASA-9'), isFalse);
     expect(matchesTaskReference(208, 'REP-9', 'abrigo 208'), isFalse);
+    expect(matchesTaskReference(208, 'REP-9', 'rep-'), isTrue);
+    expect(matchesTaskReference(208, 'REPX-9', 'REP-'), isFalse);
   });
 }
