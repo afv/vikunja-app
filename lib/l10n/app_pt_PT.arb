@@ -24,5 +24,11 @@
   "calendarWeek": "Semana",
   "calendarDay": "Dia",
   "calendarNothingMatches": "Nenhuma tarefa corresponde aos filtros",
-  "calendarClearFilters": "Limpar filtros"
+  "calendarClearFilters": "Limpar filtros",
+  "dueChipLabel": "Data limite {date}",
+  "keepAsText": "Manter como texto",
+  "phraseKeptAsText": "«{phrase}» mantido como texto",
+  "useAsDate": "Usar como data",
+  "keepAsTextFor": "Manter «{phrase}» como texto, não como data",
+  "useAsDateFor": "Usar «{phrase}» como data limite"
 }

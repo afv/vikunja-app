@@ -311,5 +311,43 @@
   "calendarWeek": "Week",
   "calendarDay": "Day",
   "calendarNothingMatches": "No tasks match these filters",
-  "calendarClearFilters": "Clear filters"
+  "calendarClearFilters": "Clear filters",
+  "dueChipLabel": "Due {date}",
+  "@dueChipLabel": {
+    "description": "Chip under the task title: the due date understood from the words typed.",
+    "placeholders": {
+      "date": {
+        "type": "String"
+      }
+    }
+  },
+  "keepAsText": "Keep as text",
+  "phraseKeptAsText": "«{phrase}» kept as text",
+  "@phraseKeptAsText": {
+    "description": "Chip shown after the user chose to keep a date phrase as part of the title.",
+    "placeholders": {
+      "phrase": {
+        "type": "String"
+      }
+    }
+  },
+  "useAsDate": "Use as a date",
+  "keepAsTextFor": "Keep «{phrase}» as text, not as a date",
+  "@keepAsTextFor": {
+    "description": "Accessibility label of the due-date chip.",
+    "placeholders": {
+      "phrase": {
+        "type": "String"
+      }
+    }
+  },
+  "useAsDateFor": "Use «{phrase}» as a due date",
+  "@useAsDateFor": {
+    "description": "Accessibility label of the kept-as-text chip.",
+    "placeholders": {
+      "phrase": {
+        "type": "String"
+      }
+    }
+  }
 }
