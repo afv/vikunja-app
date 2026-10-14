@@ -307,5 +307,7 @@
   "calendarNone": "None",
   "calendarLabels": "Labels",
   "calendarClear": "Clear",
-  "calendarNoLabels": "No labels on these tasks"
+  "calendarNoLabels": "No labels on these tasks",
+  "calendarWeek": "Week",
+  "calendarDay": "Day"
 }

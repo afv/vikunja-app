@@ -63,6 +63,12 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
   static const _pageSize = 50; // the server's default maximum page size
 
   final _month = MonthViewConfiguration.singleMonth();
+  final _week = MultiDayViewConfiguration.week(
+    initialTimeOfDay: const KalenderTime(hour: 7, minute: 0),
+  );
+  final _day = MultiDayViewConfiguration.singleDay(
+    initialTimeOfDay: const KalenderTime(hour: 7, minute: 0),
+  );
   final _agenda = ScheduleViewConfiguration.continuous();
   final _events = DefaultEventsController();
   late final KalenderController _controller = KalenderController(
@@ -103,7 +109,10 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
         !visible.end.isAfter(loaded.end)) {
       return; // already have it
     }
-    _load();
+    // The range changes while KalenderView builds; loading (and its setState) has to wait for the frame to end.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _load();
+    });
   }
 
   /// A month either side of what is visible, so paging back and forth does not wait on the network every time.
@@ -309,6 +318,8 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                 showSelectedIcon: false,
                 segments: [
                   ButtonSegment(value: _month, label: Text(l10n.calendarMonth)),
+                  ButtonSegment(value: _week, label: Text(l10n.calendarWeek)),
+                  ButtonSegment(value: _day, label: Text(l10n.calendarDay)),
                   ButtonSegment(value: _agenda, label: Text(l10n.calendarAgenda)),
                 ],
                 selected: {_controller.viewConfiguration},
@@ -358,7 +369,13 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                     tileComponents: ScheduleTileComponents(tileBuilder: _agendaTile),
                   ),
                 ),
-                const MultiDayViewParts(),
+                MultiDayViewParts(
+                  body: MultiDayBody(
+                    // Many tasks share 10:00 or 18:00; keep each tile readable instead of a hair-thin sliver.
+                    configuration: MultiDayBodyConfiguration(minimumTileHeight: 28),
+                    tileComponents: TileComponents(tileBuilder: _hourTile),
+                  ),
+                ),
               ],
             ),
           ),
@@ -382,6 +399,29 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
         e.task.title,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontSize: 11,
+          color: foreground,
+          decoration: e.task.done ? TextDecoration.lineThrough : null,
+        ),
+      ),
+    );
+  }
+
+  Widget _hourTile(BuildContext context, KalenderEvent event, KalenderDateTimeRange tileRange) {
+    final e = event as TaskEvent;
+    final foreground = e.color.computeLuminance() > 0.5 ? Colors.black : Colors.white;
+    return Container(
+      margin: const EdgeInsets.only(right: 1, bottom: 1),
+      padding: const EdgeInsets.all(3),
+      decoration: BoxDecoration(
+        color: e.color.withValues(alpha: e.task.done ? 0.45 : 1),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        e.task.title,
+        overflow: TextOverflow.ellipsis,
+        maxLines: 2,
         style: TextStyle(
           fontSize: 11,
           color: foreground,

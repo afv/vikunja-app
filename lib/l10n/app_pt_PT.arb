@@ -20,5 +20,7 @@
   "calendarNone": "Nenhum",
   "calendarLabels": "Etiquetas",
   "calendarClear": "Limpar",
-  "calendarNoLabels": "Sem etiquetas nestas tarefas"
+  "calendarNoLabels": "Sem etiquetas nestas tarefas",
+  "calendarWeek": "Semana",
+  "calendarDay": "Dia"
 }
