@@ -500,6 +500,17 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                         }
                       },
                     ),
+                    components: KalenderComponents(
+                      monthComponents: MonthComponents(
+                        // «Wednesday» does not fit a phone's column and wraps onto a second line.
+                        headerComponents: MonthHeaderComponents(
+                          weekDayHeaderStringBuilder: (context, date) =>
+                              DateFormat.E(
+                                Localizations.localeOf(context).toLanguageTag(),
+                              ).format(date),
+                        ),
+                      ),
+                    ),
                     views: [
                       MonthViewParts(
                         body: MonthBody(
