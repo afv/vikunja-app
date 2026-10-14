@@ -21,6 +21,12 @@ class CalendarDays extends StatefulWidget {
   final int columns;
   final ValueChanged<TaskEvent> onTap;
 
+  /// A long press on a task: change its due date.
+  final ValueChanged<TaskEvent> onLongPressEvent;
+
+  /// A long press on a day's empty space: a new task on that day.
+  final ValueChanged<DateTime> onLongPressDay;
+
   /// The days on screen changed (also once at the start): [start] to [end], end exclusive.
   final void Function(DateTime start, DateTime end) onVisibleDays;
 
@@ -30,6 +36,8 @@ class CalendarDays extends StatefulWidget {
     required this.start,
     required this.columns,
     required this.onTap,
+    required this.onLongPressEvent,
+    required this.onLongPressDay,
     required this.onVisibleDays,
   });
 
@@ -119,6 +127,8 @@ class CalendarDaysState extends State<CalendarDays> {
             events: byDay[day] ?? const [],
             detailed: widget.columns == 1,
             onTap: widget.onTap,
+            onLongPressEvent: widget.onLongPressEvent,
+            onLongPressDay: widget.onLongPressDay,
           );
         },
       ),
@@ -132,6 +142,8 @@ class _DayColumn extends StatelessWidget {
   final List<TaskEvent> events;
   final bool detailed;
   final ValueChanged<TaskEvent> onTap;
+  final ValueChanged<TaskEvent> onLongPressEvent;
+  final ValueChanged<DateTime> onLongPressDay;
 
   const _DayColumn({
     required this.day,
@@ -139,6 +151,8 @@ class _DayColumn extends StatelessWidget {
     required this.events,
     required this.detailed,
     required this.onTap,
+    required this.onLongPressEvent,
+    required this.onLongPressDay,
   });
 
   @override
@@ -146,51 +160,59 @@ class _DayColumn extends StatelessWidget {
     final theme = Theme.of(context);
     final locale = Localizations.localeOf(context).toLanguageTag();
     final outline = theme.colorScheme.outlineVariant;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        border: Border(right: BorderSide(color: outline)),
-      ),
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
-            child: Column(
-              children: [
-                Text(
-                  DateFormat.E(locale).format(day),
-                  style: theme.textTheme.labelMedium,
-                ),
-                const SizedBox(height: 2),
-                CircleAvatar(
-                  radius: 14,
-                  backgroundColor: isToday
-                      ? theme.colorScheme.primary
-                      : Colors.transparent,
-                  child: Text(
-                    '${day.day}',
-                    style: TextStyle(
-                      color: isToday
-                          ? theme.colorScheme.onPrimary
-                          : theme.colorScheme.onSurface,
-                      fontWeight: isToday ? FontWeight.bold : null,
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onLongPress: () => onLongPressDay(day),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          border: Border(right: BorderSide(color: outline)),
+        ),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              child: Column(
+                children: [
+                  Text(
+                    DateFormat.E(locale).format(day),
+                    style: theme.textTheme.labelMedium,
+                  ),
+                  const SizedBox(height: 2),
+                  CircleAvatar(
+                    radius: 14,
+                    backgroundColor: isToday
+                        ? theme.colorScheme.primary
+                        : Colors.transparent,
+                    child: Text(
+                      '${day.day}',
+                      style: TextStyle(
+                        color: isToday
+                            ? theme.colorScheme.onPrimary
+                            : theme.colorScheme.onSurface,
+                        fontWeight: isToday ? FontWeight.bold : null,
+                      ),
                     ),
                   ),
+                  if (events.isNotEmpty)
+                    Text('${events.length}', style: theme.textTheme.labelSmall),
+                ],
+              ),
+            ),
+            Divider(height: 1, color: outline),
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.all(3),
+                itemCount: events.length,
+                itemBuilder: (context, i) => _Chip(
+                  event: events[i],
+                  detailed: detailed,
+                  onTap: onTap,
+                  onLongPress: onLongPressEvent,
                 ),
-                if (events.isNotEmpty)
-                  Text('${events.length}', style: theme.textTheme.labelSmall),
-              ],
+              ),
             ),
-          ),
-          Divider(height: 1, color: outline),
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(3),
-              itemCount: events.length,
-              itemBuilder: (context, i) =>
-                  _Chip(event: events[i], detailed: detailed, onTap: onTap),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -200,11 +222,13 @@ class _Chip extends StatelessWidget {
   final TaskEvent event;
   final bool detailed;
   final ValueChanged<TaskEvent> onTap;
+  final ValueChanged<TaskEvent> onLongPress;
 
   const _Chip({
     required this.event,
     required this.detailed,
     required this.onTap,
+    required this.onLongPress,
   });
 
   @override
@@ -227,6 +251,7 @@ class _Chip extends StatelessWidget {
         child: InkWell(
           borderRadius: BorderRadius.circular(5),
           onTap: () => onTap(e),
+          onLongPress: () => onLongPress(e),
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 4),
             child: Column(

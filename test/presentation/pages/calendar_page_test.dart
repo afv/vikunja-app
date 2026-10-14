@@ -12,6 +12,7 @@ import 'package:vikunja_app/domain/repositories/settings_repository.dart';
 import 'package:vikunja_app/domain/repositories/task_repository.dart';
 import 'package:vikunja_app/l10n/gen/app_localizations.dart';
 import 'package:vikunja_app/presentation/pages/calendar_page.dart';
+import 'package:vikunja_app/presentation/widgets/task/add_task_dialog.dart';
 
 class FakeProjects extends Fake implements ProjectRepository {
   @override
@@ -33,6 +34,7 @@ class FakeSettings extends Fake implements SettingsRepository {
 class FakeTasks extends Fake implements TaskRepository {
   final List<String> filters = [];
   final List<Task> updated = [];
+  final List<Task> added = [];
   final List<Task> tasks;
   FakeTasks(this.tasks);
 
@@ -43,6 +45,12 @@ class FakeTasks extends Fake implements TaskRepository {
   ]) async {
     filters.add(filterString);
     return SuccessResponse(tasks, 200, {});
+  }
+
+  @override
+  Future<Response<Task>> add(int projectId, Task task) async {
+    added.add(task);
+    return SuccessResponse(task, 201, {});
   }
 
   @override
@@ -155,5 +163,22 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('Tarefa de hoje'), findsOneWidget);
     expect(find.text('Casa'), findsOneWidget); // the project path under the title
+  });
+
+  testWidgets('a long press on a day makes a task due that day, with the day preset', (tester) async {
+    final fake = await pump(tester);
+    await tester.tap(find.text('Day'));
+    await tester.pumpAndSettle();
+    await tester.longPressAt(tester.getBottomRight(find.byType(PageView)) - const Offset(40, 40));
+    await tester.pumpAndSettle();
+    expect(find.byType(AddTaskDialog), findsOneWidget);
+
+    await tester.enterText(find.byType(TextField).first, 'Comprar pão');
+    await tester.pump();
+    await tester.tap(find.text('Add'));
+    await tester.pumpAndSettle();
+    final now = DateTime.now();
+    expect(fake.added.single.title, 'Comprar pão');
+    expect(fake.added.single.dueDate, DateTime(now.year, now.month, now.day, 9));
   });
 }

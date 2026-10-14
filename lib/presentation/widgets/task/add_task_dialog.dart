@@ -19,12 +19,16 @@ class AddTaskDialog extends StatefulWidget {
   final List<Project> projects;
   final int? initialProjectId;
 
+  /// A due date to start with (a day picked on the calendar); it can still be changed.
+  final DateTime? initialDueDate;
+
   const AddTaskDialog({
     super.key,
     required this.onAddTask,
     this.title,
     this.projects = const [],
     this.initialProjectId,
+    this.initialDueDate,
   });
 
   @override
@@ -48,6 +52,10 @@ class AddTaskDialogState extends State<AddTaskDialog> {
     }
     textController.addListener(_onTitleChanged);
     selectedProjectId = widget.initialProjectId;
+    if (widget.initialDueDate != null) {
+      newTaskDue = NewTaskDue.custom;
+      dueDate = widget.initialDueDate;
+    }
   }
 
   @override
@@ -159,6 +167,7 @@ class AddTaskDialogState extends State<AddTaskDialog> {
                   padding: const EdgeInsets.symmetric(horizontal: 8.0),
                   child: VikunjaDateTimeField(
                     label: l10n.enterExactTime,
+                    initialValue: widget.initialDueDate,
                     onChanged: (value) {
                       setState(() => newTaskDue = NewTaskDue.custom);
                       dueDate = value;

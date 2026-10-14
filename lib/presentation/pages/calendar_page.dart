@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 import 'package:kalender/kalender.dart';
+import 'package:vikunja_app/core/di/network_provider.dart';
 import 'package:vikunja_app/core/di/repository_provider.dart';
 import 'package:vikunja_app/core/utils/calendar.dart';
 import 'package:vikunja_app/domain/entities/project.dart';
@@ -13,6 +14,7 @@ import 'package:vikunja_app/l10n/gen/app_localizations.dart';
 import 'package:vikunja_app/presentation/pages/task/task_detail_page.dart';
 import 'package:vikunja_app/presentation/widgets/calendar/calendar_days.dart';
 import 'package:vikunja_app/presentation/widgets/calendar/calendar_filters_sheet.dart';
+import 'package:vikunja_app/presentation/widgets/task/add_task_dialog.dart';
 
 /// A task on the calendar, at its due date. Recurring tasks show their next occurrence only, as the server stores it.
 class TaskEvent extends KalenderEvent {
@@ -342,8 +344,83 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
     }
   }
 
-  Future<void> _reschedule(TaskEvent original, TaskEvent updated) async {
-    final newDue = rescheduledDue(original.task, updated.start);
+  /// Long-press on an empty day: a new task due that day at 09:00 (the dialog lets the time be changed).
+  Future<void> _newTaskOn(DateTime day) async {
+    final projects = _projects.where((p) => p.id > 0 && !p.isArchived).toList();
+    if (projects.isEmpty) return;
+    final preferred = ref.read(currentUserProvider)?.settings?.defaultProjectId;
+    final initial = projects.any((p) => p.id == preferred)
+        ? preferred
+        : projects.first.id;
+    await showDialog<void>(
+      context: context,
+      builder: (_) => AddTaskDialog(
+        initialProjectId: initial,
+        projects: projects,
+        initialDueDate: DateTime(day.year, day.month, day.day, 9),
+        onAddTask: (title, dueDate, projectId, priority) =>
+            _addTask(title, dueDate, projectId ?? initial!, priority),
+      ),
+    );
+  }
+
+  Future<void> _addTask(
+    String title,
+    DateTime? due,
+    int projectId,
+    int priority,
+  ) async {
+    final user = ref.read(currentUserProvider);
+    final messenger = ScaffoldMessenger.of(context);
+    final l10n = AppLocalizations.of(context);
+    final response = await ref
+        .read(taskRepositoryProvider)
+        .add(
+          projectId,
+          Task(
+            title: title,
+            dueDate: due,
+            createdBy: user,
+            projectId: projectId,
+            priority: priority,
+          ),
+        );
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          response.isSuccessful ? l10n.taskAddedSuccess : l10n.taskAddError,
+        ),
+      ),
+    );
+    if (mounted && response.isSuccessful) _load();
+  }
+
+  /// Long-press on a task in the week and day columns: pick a new date and time for it.
+  Future<void> _pickNewDue(TaskEvent event) async {
+    final current = event.start;
+    final date = await showDatePicker(
+      context: context,
+      initialDate: current,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (date == null || !mounted) return;
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(current),
+    );
+    if (time == null || !mounted) return;
+    await _setDue(
+      event,
+      DateTime(date.year, date.month, date.day, time.hour, time.minute),
+    );
+  }
+
+  Future<void> _reschedule(TaskEvent original, TaskEvent updated) =>
+      _setDue(original, updated.start);
+
+  Future<void> _setDue(TaskEvent original, DateTime start) async {
+    final newDue = rescheduledDue(original.task, start);
     final messenger = ScaffoldMessenger.of(context);
     final l10n = AppLocalizations.of(context);
     if (newDue == null) return;
@@ -487,6 +564,8 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                     start: _daysStart,
                     columns: _mode == CalendarMode.week ? 3 : 1,
                     onTap: _open,
+                    onLongPressEvent: _pickNewDue,
+                    onLongPressDay: _newTaskOn,
                     onVisibleDays: (start, end) {
                       _daysFocus.value = start;
                       _daysRange = DateTimeRange(start: start, end: end);
@@ -507,6 +586,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                       onEventTapped: (event) {
                         if (event is TaskEvent) _open(event);
                       },
+                      onLongPressed: _newTaskOn,
                       onEventChanged: (original, updated) {
                         if (original is TaskEvent && updated is TaskEvent) {
                           _reschedule(original, updated);
