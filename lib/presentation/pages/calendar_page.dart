@@ -80,6 +80,12 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
   final _daysFocus = ValueNotifier<DateTime>(DateTime.now());
   List<TaskEvent> _taskEvents = [];
 
+  /// The chosen saved filter, unless it has been deleted since (then every task is shown again).
+  int get _source =>
+      _projects.any((p) => savedFilterId(p.id) == _filters.source)
+      ? _filters.source
+      : 0;
+
   bool get _custom => _mode == CalendarMode.week || _mode == CalendarMode.day;
 
   /// What is on screen right now, whichever view is showing it.
@@ -97,6 +103,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
 
   CalendarFilters _filters = const CalendarFilters();
   List<Project> _projects = [];
+  final Map<int, String> _expressions = {};
   List<Task> _tasks = [];
   bool _loading = false;
   bool _failed = false;
@@ -161,14 +168,33 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
     final tasks = <Task>[];
     var ok = true;
     try {
-      for (var page = 1; page <= _maxPages; page++) {
+      // with a saved filter chosen, its expression goes in with the range (see combineFilter)
+      var saved = '';
+      if (_source > 0) {
+        if (!_expressions.containsKey(_source)) {
+          final expression = await ref
+              .read(projectRepositoryProvider)
+              .getSavedFilterExpression(_source)
+              .timeout(_requestTimeout);
+          if (expression.isSuccessful) {
+            _expressions[_source] = expression.toSuccess().body;
+          } else {
+            ok = false;
+          }
+        }
+        saved = _expressions[_source] ?? '';
+      }
+      for (var page = 1; page <= _maxPages && ok; page++) {
         final response = await ref
             .read(taskRepositoryProvider)
             .getByFilterString(
-              dueDateRangeFilter(
-                wanted.start,
-                wanted.end,
-                showDone: _filters.showDone,
+              combineFilter(
+                saved,
+                dueDateRangeFilter(
+                  wanted.start,
+                  wanted.end,
+                  showDone: _filters.showDone,
+                ),
               ),
               {
                 'filter_include_nulls': ['false'],
@@ -310,10 +336,13 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
       context,
       projects: _projects,
       tasks: _tasks,
+      savedFilters: _projects.where((p) => savedFilterId(p.id) > 0).toList(),
       filters: _filters,
       onChanged: (changed) {
         if (!mounted) return;
-        final reload = changed.showDone != _filters.showDone;
+        final reload =
+            changed.showDone != _filters.showDone ||
+            changed.source != _filters.source;
         setState(() => _filters = changed);
         _saveFilters(changed);
         reload ? _load() : _refreshEvents();
@@ -455,7 +484,9 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
     final filtering =
-        _filters.hiddenProjects.isNotEmpty || _filters.labels.isNotEmpty;
+        _filters.hiddenProjects.isNotEmpty ||
+        _filters.labels.isNotEmpty ||
+        _source > 0;
 
     return Scaffold(
       appBar: AppBar(

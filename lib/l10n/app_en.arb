@@ -311,5 +311,7 @@
   "calendarWeek": "Week",
   "calendarDay": "Day",
   "calendarNothingMatches": "No tasks match these filters",
-  "calendarClearFilters": "Clear filters"
+  "calendarClearFilters": "Clear filters",
+  "calendarSource": "Show",
+  "calendarSourceAll": "All tasks"
 }

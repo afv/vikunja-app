@@ -79,9 +79,8 @@ Set<int> setNodeVisible(ProjectNode node, bool visible, Set<int> hidden) {
 }
 
 /// Show everything, or hide everything.
-Set<int> setAllVisible(List<ProjectNode> tree, bool visible) => visible
-    ? <int>{}
-    : {for (final node in tree) ...subtreeIds(node)};
+Set<int> setAllVisible(List<ProjectNode> tree, bool visible) =>
+    visible ? <int>{} : {for (final node in tree) ...subtreeIds(node)};
 
 /// Project titles from the root down to the project: «Aveiro › Cozinha». Guards against cycles.
 List<String> projectPath(List<Project> projects, int projectId) {
@@ -105,11 +104,15 @@ class CalendarFilters {
   final bool colorByProject;
   final bool showDone;
 
+  /// The saved filter whose tasks are shown, by its filter id; 0 = every task.
+  final int source;
+
   const CalendarFilters({
     this.hiddenProjects = const {},
     this.labels = const {},
     this.colorByProject = false,
     this.showDone = false,
+    this.source = 0,
   });
 
   CalendarFilters copyWith({
@@ -117,11 +120,13 @@ class CalendarFilters {
     Set<int>? labels,
     bool? colorByProject,
     bool? showDone,
+    int? source,
   }) => CalendarFilters(
     hiddenProjects: hiddenProjects ?? this.hiddenProjects,
     labels: labels ?? this.labels,
     colorByProject: colorByProject ?? this.colorByProject,
     showDone: showDone ?? this.showDone,
+    source: source ?? this.source,
   );
 
   Map<String, dynamic> toJson() => {
@@ -129,6 +134,7 @@ class CalendarFilters {
     'labels': labels.toList(),
     'colorByProject': colorByProject,
     'showDone': showDone,
+    'source': source,
   };
 
   /// Whatever comes out of storage becomes a valid state; garbage falls back to the defaults.
@@ -140,6 +146,9 @@ class CalendarFilters {
       labels: ids(json['labels']),
       colorByProject: json['colorByProject'] == true,
       showDone: json['showDone'] == true,
+      source: json['source'] is int && (json['source'] as int) > 0
+          ? json['source'] as int
+          : 0,
     );
   }
 
@@ -182,7 +191,11 @@ List<LabelUse> labelsInUse(Iterable<Task> tasks) {
 }
 
 /// The due date filter for a visible range, as the API wants it: whole days, in UTC.
-String dueDateRangeFilter(DateTime start, DateTime end, {bool showDone = false}) {
+String dueDateRangeFilter(
+  DateTime start,
+  DateTime end, {
+  bool showDone = false,
+}) {
   String iso(DateTime d) => d.toUtc().toIso8601String();
   return [
     if (!showDone) 'done = false',
@@ -198,3 +211,13 @@ DateTime? rescheduledDue(Task task, DateTime start) {
   if (due == null) return null;
   return due.isAtSameMomentAs(start) ? null : start;
 }
+
+/// A saved filter narrowed to the visible range. The server ignores an extra date filter on a saved filter's own
+/// endpoint, so the filter's expression and the range go to the tasks endpoint as one, the expression in brackets.
+String combineFilter(String saved, String range) {
+  final expression = saved.trim();
+  return expression.isEmpty ? range : '($expression) && $range';
+}
+
+/// The filter id of a saved filter listed as the pseudo-project [projectId] (`-n` is filter `n - 1`); 0 for a real project.
+int savedFilterId(int projectId) => projectId < -1 ? -projectId - 1 : 0;

@@ -35,7 +35,10 @@ void main() {
   group('buildProjectTree', () {
     test('nests children and orders siblings by position', () {
       expect(tree.map((n) => n.project.title), ['Casa', 'Aveiro']);
-      expect(casa.children.map((n) => n.project.title), ['Arrumar', 'Manutenção']);
+      expect(casa.children.map((n) => n.project.title), [
+        'Arrumar',
+        'Manutenção',
+      ]);
       expect(arrumar.children.map((n) => n.project.title), ['Cozinha', 'Sala']);
     });
 
@@ -46,7 +49,9 @@ void main() {
     });
 
     test('a project with a missing parent becomes a root', () {
-      final orphan = buildProjectTree([Project(id: 9, title: 'O', parentProjectId: 99)]);
+      final orphan = buildProjectTree([
+        Project(id: 9, title: 'O', parentProjectId: 99),
+      ]);
       expect(orphan.single.project.id, 9);
     });
 
@@ -60,11 +65,17 @@ void main() {
   });
 
   group('colorForProject', () {
-    test('keeps its own colour, derives a stable and distinct one otherwise', () {
-      expect(colorForProject(1, const Color(0xFFFF0000)), const Color(0xFFFF0000));
-      expect(colorForProject(7), colorForProject(7));
-      expect({for (var i = 1; i <= 8; i++) colorForProject(i)}.length, 8);
-    });
+    test(
+      'keeps its own colour, derives a stable and distinct one otherwise',
+      () {
+        expect(
+          colorForProject(1, const Color(0xFFFF0000)),
+          const Color(0xFFFF0000),
+        );
+        expect(colorForProject(7), colorForProject(7));
+        expect({for (var i = 1; i <= 8; i++) colorForProject(i)}.length, 8);
+      },
+    );
   });
 
   group('checkbox state', () {
@@ -96,8 +107,14 @@ void main() {
     final labels = [Label(id: 10, title: 'a'), Label(id: 11, title: 'b')];
 
     test('hides tasks of hidden projects', () {
-      expect(const CalendarFilters(hiddenProjects: {3}).isVisible(task(3)), isFalse);
-      expect(const CalendarFilters(hiddenProjects: {4}).isVisible(task(3)), isTrue);
+      expect(
+        const CalendarFilters(hiddenProjects: {3}).isVisible(task(3)),
+        isFalse,
+      );
+      expect(
+        const CalendarFilters(hiddenProjects: {4}).isVisible(task(3)),
+        isTrue,
+      );
     });
 
     test('with labels picked, needs at least one of them', () {
@@ -123,41 +140,100 @@ void main() {
   test('labelsInUse counts tasks per label, most used first', () {
     final jardim = Label(id: 2, title: 'jardim');
     final used = labelsInUse([
-      task(1, labels: [Label(id: 1, title: 'sítio'), jardim]),
+      task(
+        1,
+        labels: [
+          Label(id: 1, title: 'sítio'),
+          jardim,
+        ],
+      ),
       task(1, labels: [jardim]),
       task(1),
     ]);
     expect(used.map((l) => (l.title, l.count)), [('jardim', 2), ('sítio', 1)]);
   });
 
-  test('dueDateRangeFilter is in UTC and leaves out finished tasks unless asked', () {
-    final start = DateTime.utc(2026, 10, 1);
-    final end = DateTime.utc(2026, 11, 1);
-    expect(
-      dueDateRangeFilter(start, end),
-      'done = false && due_date >= 2026-10-01T00:00:00.000Z && due_date < 2026-11-01T00:00:00.000Z',
-    );
-    expect(dueDateRangeFilter(start, end, showDone: true), isNot(contains('done')));
-  });
+  test(
+    'dueDateRangeFilter is in UTC and leaves out finished tasks unless asked',
+    () {
+      final start = DateTime.utc(2026, 10, 1);
+      final end = DateTime.utc(2026, 11, 1);
+      expect(
+        dueDateRangeFilter(start, end),
+        'done = false && due_date >= 2026-10-01T00:00:00.000Z && due_date < 2026-11-01T00:00:00.000Z',
+      );
+      expect(
+        dueDateRangeFilter(start, end, showDone: true),
+        isNot(contains('done')),
+      );
+    },
+  );
 
   test('rescheduledDue is null when the task did not move', () {
     final due = DateTime.utc(2026, 10, 12, 10);
     expect(rescheduledDue(task(1, due: due), due), isNull);
-    expect(rescheduledDue(task(1, due: due), due.add(const Duration(days: 1))), due.add(const Duration(days: 1)));
+    expect(
+      rescheduledDue(task(1, due: due), due.add(const Duration(days: 1))),
+      due.add(const Duration(days: 1)),
+    );
     expect(rescheduledDue(task(1), due), isNull);
   });
 
-  test('filters survive a round trip through JSON, and garbage gives the defaults', () {
-    const f = CalendarFilters(hiddenProjects: {3, 4}, labels: {10}, colorByProject: true, showDone: true);
-    final back = CalendarFilters.fromJson(f.toJson());
-    expect(back.hiddenProjects, {3, 4});
-    expect(back.labels, {10});
-    expect(back.colorByProject, isTrue);
-    expect(back.showDone, isTrue);
-    final bad = CalendarFilters.fromJson('nope');
-    expect(bad.hiddenProjects, isEmpty);
-    expect(bad.labels, isEmpty);
-    expect(bad.colorByProject, isFalse);
-    expect(CalendarFilters.fromJson({'hiddenProjects': 'x', 'labels': [1, 'a']}).labels, {1});
+  test(
+    'filters survive a round trip through JSON, and garbage gives the defaults',
+    () {
+      const f = CalendarFilters(
+        hiddenProjects: {3, 4},
+        labels: {10},
+        colorByProject: true,
+        showDone: true,
+      );
+      final back = CalendarFilters.fromJson(f.toJson());
+      expect(back.hiddenProjects, {3, 4});
+      expect(back.labels, {10});
+      expect(back.colorByProject, isTrue);
+      expect(back.showDone, isTrue);
+      final bad = CalendarFilters.fromJson('nope');
+      expect(bad.hiddenProjects, isEmpty);
+      expect(bad.labels, isEmpty);
+      expect(bad.colorByProject, isFalse);
+      expect(
+        CalendarFilters.fromJson({
+          'hiddenProjects': 'x',
+          'labels': [1, 'a'],
+        }).labels,
+        {1},
+      );
+    },
+  );
+
+  test('combineFilter brackets the saved expression and adds the range', () {
+    expect(
+      combineFilter('done = false || priority >= 4', 'due_date >= a'),
+      '(done = false || priority >= 4) && due_date >= a',
+    );
+    expect(combineFilter('  ', 'due_date >= a'), 'due_date >= a');
+  });
+
+  test(
+    'savedFilterId maps the pseudo-project id to the filter id, and real projects to 0',
+    () {
+      expect(savedFilterId(-15), 14);
+      expect(savedFilterId(-2), 1);
+      expect(savedFilterId(-1), 0); // favourites
+      expect(savedFilterId(0), 0);
+      expect(savedFilterId(7), 0);
+    },
+  );
+
+  test('the source survives JSON and a bad one is dropped', () {
+    expect(
+      CalendarFilters.fromJson(
+        const CalendarFilters(source: 14).toJson(),
+      ).source,
+      14,
+    );
+    expect(CalendarFilters.fromJson({'source': -3}).source, 0);
+    expect(CalendarFilters.fromJson({'source': '14'}).source, 0);
   });
 }

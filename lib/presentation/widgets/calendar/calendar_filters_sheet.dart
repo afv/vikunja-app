@@ -10,6 +10,7 @@ Future<void> showCalendarFilters(
   BuildContext context, {
   required List<Project> projects,
   required List<Task> tasks,
+  required List<Project> savedFilters,
   required CalendarFilters filters,
   required ValueChanged<CalendarFilters> onChanged,
 }) {
@@ -26,6 +27,7 @@ Future<void> showCalendarFilters(
         scroll: scroll,
         projects: projects,
         tasks: tasks,
+        savedFilters: savedFilters,
         initial: filters,
         onChanged: onChanged,
       ),
@@ -37,6 +39,7 @@ class _FiltersBody extends StatefulWidget {
   final ScrollController scroll;
   final List<Project> projects;
   final List<Task> tasks;
+  final List<Project> savedFilters;
   final CalendarFilters initial;
   final ValueChanged<CalendarFilters> onChanged;
 
@@ -44,6 +47,7 @@ class _FiltersBody extends StatefulWidget {
     required this.scroll,
     required this.projects,
     required this.tasks,
+    required this.savedFilters,
     required this.initial,
     required this.onChanged,
   });
@@ -161,6 +165,24 @@ class _FiltersBodyState extends State<_FiltersBody> {
       controller: widget.scroll,
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
       children: [
+        if (widget.savedFilters.isNotEmpty) ...[
+          Text(l10n.calendarSource, style: heading),
+          const SizedBox(height: 4),
+          DropdownButton<int>(
+            isExpanded: true,
+            value: _filters.source,
+            items: [
+              DropdownMenuItem(value: 0, child: Text(l10n.calendarSourceAll)),
+              for (final filter in widget.savedFilters)
+                DropdownMenuItem(
+                  value: savedFilterId(filter.id),
+                  child: Text(filter.title, overflow: TextOverflow.ellipsis),
+                ),
+            ],
+            onChanged: (value) => _apply(_filters.copyWith(source: value ?? 0)),
+          ),
+          const Divider(),
+        ],
         Text(l10n.calendarColorBy, style: heading),
         const SizedBox(height: 8),
         SegmentedButton<bool>(

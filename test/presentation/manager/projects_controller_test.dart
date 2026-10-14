@@ -29,6 +29,11 @@ class MockProjectRepository implements ProjectRepository {
   Future<Response<Project>> update(Project p) {
     throw UnimplementedError();
   }
+
+  @override
+  Future<Response<String>> getSavedFilterExpression(int filterId) {
+    throw UnimplementedError();
+  }
 }
 
 void main() {

@@ -37,6 +37,14 @@ class ProjectDataSource extends RemoteDataSource {
     );
   }
 
+  /// The expression of a saved filter (its filter id, not its pseudo-project id).
+  Future<Response<String>> getSavedFilterExpression(int filterId) {
+    return client.get(
+      url: '/filters/$filterId',
+      mapper: (body) => (body['filters']?['filter'] ?? '') as String,
+    );
+  }
+
   Future<Response<ProjectDto>> update(ProjectDto p) {
     return client.post(
       url: '/projects/${p.id}',

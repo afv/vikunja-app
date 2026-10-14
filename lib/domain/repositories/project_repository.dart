@@ -9,4 +9,7 @@ abstract class ProjectRepository {
   Future<Response<List<Project>>> getAll({int page = 1, String? search});
 
   Future<Response<Project>> update(Project p);
+
+  /// The expression of a saved filter, by its filter id (a saved filter listed as project `-n` has filter id `n - 1`).
+  Future<Response<String>> getSavedFilterExpression(int filterId);
 }

@@ -24,5 +24,7 @@
   "calendarWeek": "Semana",
   "calendarDay": "Dia",
   "calendarNothingMatches": "Nenhuma tarefa corresponde aos filtros",
-  "calendarClearFilters": "Limpar filtros"
+  "calendarClearFilters": "Limpar filtros",
+  "calendarSource": "Mostrar",
+  "calendarSourceAll": "Todas as tarefas"
 }

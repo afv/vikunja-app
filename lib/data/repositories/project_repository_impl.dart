@@ -41,6 +41,10 @@ class ProjectRepositoryImpl extends ProjectRepository {
   }
 
   @override
+  Future<Response<String>> getSavedFilterExpression(int filterId) =>
+      _dataSource.getSavedFilterExpression(filterId);
+
+  @override
   Future<Response<Project>> update(Project p) async {
     return (await _dataSource.update(ProjectDto.fromDomain(p))).toDomain();
   }

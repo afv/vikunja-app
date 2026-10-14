@@ -16,8 +16,22 @@ import 'package:vikunja_app/presentation/widgets/task/add_task_dialog.dart';
 
 class FakeProjects extends Fake implements ProjectRepository {
   @override
-  Future<Response<List<Project>>> getAll({int page = 1, String? search}) async =>
-      SuccessResponse([Project(id: 1, title: 'Casa'), Project(id: 2, title: 'Aveiro')], 200, {});
+  Future<Response<List<Project>>> getAll({
+    int page = 1,
+    String? search,
+  }) async => SuccessResponse(
+    [
+      Project(id: 1, title: 'Casa'),
+      Project(id: 2, title: 'Aveiro'),
+      Project(id: -15, title: 'Hoje — 3 coisas'),
+    ],
+    200,
+    {},
+  );
+
+  @override
+  Future<Response<String>> getSavedFilterExpression(int filterId) async =>
+      SuccessResponse(filterId == 14 ? 'priority >= 4' : '', 200, {});
 }
 
 class FakeSettings extends Fake implements SettingsRepository {
@@ -77,15 +91,29 @@ void main() {
         dueDate: DateTime(now.year, now.month, 15, 10),
         labels: [Label(id: 5, title: 'limpeza')],
       ),
-      Task(id: 3, title: 'Tarefa de hoje', createdBy: null, projectId: 1, dueDate: DateTime(now.year, now.month, now.day, 12)),
-      Task(id: 2, title: 'Regar plantas', createdBy: null, projectId: 2, dueDate: DateTime(now.year, now.month, 15, 18)),
+      Task(
+        id: 3,
+        title: 'Tarefa de hoje',
+        createdBy: null,
+        projectId: 1,
+        dueDate: DateTime(now.year, now.month, now.day, 12),
+      ),
+      Task(
+        id: 2,
+        title: 'Regar plantas',
+        createdBy: null,
+        projectId: 2,
+        dueDate: DateTime(now.year, now.month, 15, 18),
+      ),
     ]);
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
           taskRepositoryProvider.overrideWithValue(fake),
           projectRepositoryProvider.overrideWithValue(FakeProjects()),
-          settingsRepositoryProvider.overrideWithValue(settings ?? FakeSettings()),
+          settingsRepositoryProvider.overrideWithValue(
+            settings ?? FakeSettings(),
+          ),
         ],
         child: MaterialApp(
           home: const CalendarPage(),
@@ -99,15 +127,20 @@ void main() {
     return fake;
   }
 
-  testWidgets('shows the tasks due this month and asks the server for a date range', (tester) async {
-    final fake = await pump(tester);
-    expect(find.text('Aspirar a casa'), findsOneWidget);
-    expect(find.text('Regar plantas'), findsOneWidget);
-    expect(fake.filters.first, contains('due_date >='));
-    expect(fake.filters.first, contains('done = false'));
-  });
+  testWidgets(
+    'shows the tasks due this month and asks the server for a date range',
+    (tester) async {
+      final fake = await pump(tester);
+      expect(find.text('Aspirar a casa'), findsOneWidget);
+      expect(find.text('Regar plantas'), findsOneWidget);
+      expect(fake.filters.first, contains('due_date >='));
+      expect(fake.filters.first, contains('done = false'));
+    },
+  );
 
-  testWidgets('hiding a project in the filter sheet removes its tasks', (tester) async {
+  testWidgets('hiding a project in the filter sheet removes its tasks', (
+    tester,
+  ) async {
     await pump(tester);
     await tester.tap(find.byTooltip('Filters'));
     await tester.pumpAndSettle();
@@ -119,7 +152,9 @@ void main() {
     expect(find.text('Regar plantas'), findsNothing);
   });
 
-  testWidgets('the agenda view shows the project and the labels', (tester) async {
+  testWidgets('the agenda view shows the project and the labels', (
+    tester,
+  ) async {
     await pump(tester);
     await tester.tap(find.text('Agenda'));
     await tester.pumpAndSettle();
@@ -127,58 +162,97 @@ void main() {
     expect(find.text('limpeza'), findsOneWidget);
   });
 
-  testWidgets('a filter change is saved, and a saved one is applied on the next start', (tester) async {
-    final settings = FakeSettings();
-    await pump(tester, settings);
-    await tester.tap(find.byTooltip('Filters'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Aveiro'));
-    await tester.pumpAndSettle();
-    expect(settings.stored, contains('"hiddenProjects":[2]'));
+  testWidgets(
+    'a filter change is saved, and a saved one is applied on the next start',
+    (tester) async {
+      final settings = FakeSettings();
+      await pump(tester, settings);
+      await tester.tap(find.byTooltip('Filters'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Aveiro'));
+      await tester.pumpAndSettle();
+      expect(settings.stored, contains('"hiddenProjects":[2]'));
 
-    // a new page, as after restarting the app
-    await tester.pumpWidget(const SizedBox());
-    await pump(tester, FakeSettings(settings.stored));
-    expect(find.text('Aspirar a casa'), findsOneWidget);
-    expect(find.text('Regar plantas'), findsNothing);
-  });
+      // a new page, as after restarting the app
+      await tester.pumpWidget(const SizedBox());
+      await pump(tester, FakeSettings(settings.stored));
+      expect(find.text('Aspirar a casa'), findsOneWidget);
+      expect(find.text('Regar plantas'), findsNothing);
+    },
+  );
 
-  testWidgets('week and day show the task columns, starting on this week and on today', (tester) async {
-    await pump(tester);
-    await tester.tap(find.text('Week'));
-    await tester.pumpAndSettle();
-    // the week opens on its Monday; a task of the 15th is within the three columns only when the 15th is near
-    final now = DateTime.now();
-    final monday = now.subtract(Duration(days: now.weekday - DateTime.monday));
-    expect(find.text('${monday.day}'), findsWidgets);
+  testWidgets(
+    'week and day show the task columns, starting on this week and on today',
+    (tester) async {
+      await pump(tester);
+      await tester.tap(find.text('Week'));
+      await tester.pumpAndSettle();
+      // the week opens on its Monday; a task of the 15th is within the three columns only when the 15th is near
+      final now = DateTime.now();
+      final monday = now.subtract(
+        Duration(days: now.weekday - DateTime.monday),
+      );
+      expect(find.text('${monday.day}'), findsWidgets);
 
-    await tester.tap(find.text('Day'));
-    await tester.pumpAndSettle();
-    expect(find.text('${now.day}'), findsWidgets);
-  });
+      await tester.tap(find.text('Day'));
+      await tester.pumpAndSettle();
+      expect(find.text('${now.day}'), findsWidgets);
+    },
+  );
 
-  testWidgets("the day view lists today's tasks with their project", (tester) async {
+  testWidgets("the day view lists today's tasks with their project", (
+    tester,
+  ) async {
     await pump(tester);
     await tester.tap(find.text('Day'));
     await tester.pumpAndSettle();
     expect(find.text('Tarefa de hoje'), findsOneWidget);
-    expect(find.text('Casa'), findsOneWidget); // the project path under the title
+    expect(
+      find.text('Casa'),
+      findsOneWidget,
+    ); // the project path under the title
   });
 
-  testWidgets('a long press on a day makes a task due that day, with the day preset', (tester) async {
-    final fake = await pump(tester);
-    await tester.tap(find.text('Day'));
-    await tester.pumpAndSettle();
-    await tester.longPressAt(tester.getBottomRight(find.byType(PageView)) - const Offset(40, 40));
-    await tester.pumpAndSettle();
-    expect(find.byType(AddTaskDialog), findsOneWidget);
+  testWidgets(
+    'a long press on a day makes a task due that day, with the day preset',
+    (tester) async {
+      final fake = await pump(tester);
+      await tester.tap(find.text('Day'));
+      await tester.pumpAndSettle();
+      await tester.longPressAt(
+        tester.getBottomRight(find.byType(PageView)) - const Offset(40, 40),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(AddTaskDialog), findsOneWidget);
 
-    await tester.enterText(find.byType(TextField).first, 'Comprar pão');
-    await tester.pump();
-    await tester.tap(find.text('Add'));
-    await tester.pumpAndSettle();
-    final now = DateTime.now();
-    expect(fake.added.single.title, 'Comprar pão');
-    expect(fake.added.single.dueDate, DateTime(now.year, now.month, now.day, 9));
-  });
+      await tester.enterText(find.byType(TextField).first, 'Comprar pão');
+      await tester.pump();
+      await tester.tap(find.text('Add'));
+      await tester.pumpAndSettle();
+      final now = DateTime.now();
+      expect(fake.added.single.title, 'Comprar pão');
+      expect(
+        fake.added.single.dueDate,
+        DateTime(now.year, now.month, now.day, 9),
+      );
+    },
+  );
+
+  testWidgets(
+    'choosing a saved filter reloads with its expression in front of the range',
+    (tester) async {
+      final fake = await pump(tester);
+      expect(fake.filters.last, isNot(contains('priority')));
+      await tester.tap(find.byTooltip('Filters'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('All tasks'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Hoje — 3 coisas').last);
+      await tester.pumpAndSettle();
+      expect(
+        fake.filters.last,
+        startsWith('(priority >= 4) && done = false && due_date >='),
+      );
+    },
+  );
 }
