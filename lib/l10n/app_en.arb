@@ -288,5 +288,24 @@
       "done": {"type": "int"},
       "total": {"type": "int"}
     }
-  }
+  },
+  "calendarTab": "Calendar",
+  "calendarToday": "Today",
+  "calendarPrevious": "Previous",
+  "calendarNext": "Next",
+  "calendarFilters": "Filters",
+  "calendarMonth": "Month",
+  "calendarAgenda": "Agenda",
+  "calendarRescheduleError": "Could not change the due date",
+  "calendarLoadError": "Could not load the calendar",
+  "calendarColorBy": "Colour by",
+  "calendarColorTask": "Task",
+  "calendarColorProject": "Project",
+  "calendarShowDone": "Show finished tasks",
+  "calendarProjects": "Projects",
+  "calendarAll": "All",
+  "calendarNone": "None",
+  "calendarLabels": "Labels",
+  "calendarClear": "Clear",
+  "calendarNoLabels": "No labels on these tasks"
 }

@@ -20,7 +20,7 @@ dependencies:
   dynamic_color: ^1.7.0
   flutter_colorpicker: ^1.1.0
   flutter_lints: ^6.0.0
-  flutter_local_notifications: ^20.0.0
+  flutter_local_notifications: ^22.3.2
   flutter_riverpod: ^2.6.1
   flutter_secure_storage: ^10.0.0
   flutter_spinkit: ^5.2.2
@@ -38,7 +38,7 @@ dependencies:
   riverpod_annotation: ^2.6.1
   sentry_flutter: ^9.6.0
   sentry_logging: ^9.6.0
-  timezone: ^0.10.0
+  timezone: ^0.11.0
   app_links: ^6.4.0
   crypto: ^3.0.6
   url_launcher: ^6.2.5
@@ -46,6 +46,7 @@ dependencies:
   file_picker: ^10.3.10
   flutter_pdfview: ^1.4.5
   webview_flutter: ^4.14.1
+  kalender: 0.33.0
 
 dev_dependencies:
   flutter_test:

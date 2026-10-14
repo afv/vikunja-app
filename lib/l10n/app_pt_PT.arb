@@ -1,5 +1,24 @@
 {
   "savedFiltersTitle": "Filtros",
   "searchOnlyInDescription": "Só na descrição",
-  "checklistProgress": "{done} de {total} tarefas"
+  "checklistProgress": "{done} de {total} tarefas",
+  "calendarTab": "Calendário",
+  "calendarToday": "Hoje",
+  "calendarPrevious": "Anterior",
+  "calendarNext": "Seguinte",
+  "calendarFilters": "Filtros",
+  "calendarMonth": "Mês",
+  "calendarAgenda": "Agenda",
+  "calendarRescheduleError": "Não foi possível alterar a data limite",
+  "calendarLoadError": "Não foi possível carregar o calendário",
+  "calendarColorBy": "Cor por",
+  "calendarColorTask": "Tarefa",
+  "calendarColorProject": "Projeto",
+  "calendarShowDone": "Mostrar tarefas concluídas",
+  "calendarProjects": "Projetos",
+  "calendarAll": "Todos",
+  "calendarNone": "Nenhum",
+  "calendarLabels": "Etiquetas",
+  "calendarClear": "Limpar",
+  "calendarNoLabels": "Sem etiquetas nestas tarefas"
 }

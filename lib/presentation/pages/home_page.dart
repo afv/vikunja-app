@@ -17,6 +17,7 @@ import 'package:vikunja_app/main.dart';
 import 'package:vikunja_app/presentation/manager/notifications.dart';
 import 'package:vikunja_app/presentation/manager/settings_controller.dart';
 import 'package:vikunja_app/presentation/manager/task_page_controller.dart';
+import 'package:vikunja_app/presentation/pages/calendar_page.dart';
 import 'package:vikunja_app/presentation/pages/project/project_list_page.dart';
 import 'package:vikunja_app/presentation/pages/settings_page.dart';
 import 'package:vikunja_app/presentation/pages/task/task_list_page.dart';
@@ -38,6 +39,7 @@ class HomePageState extends ConsumerState<HomePage> {
 
   List<Widget> widgets = [
     TaskListPage(),
+    CalendarPage(),
     ProjectListPage(),
     ProjectListPage(filters: true),
     SettingsPage(),
@@ -47,6 +49,10 @@ class HomePageState extends ConsumerState<HomePage> {
     NavigationDestination(
       icon: Icon(Icons.home),
       label: AppLocalizations.of(context).homeTab,
+    ),
+    NavigationDestination(
+      icon: Icon(Icons.calendar_month),
+      label: AppLocalizations.of(context).calendarTab,
     ),
     NavigationDestination(
       icon: Icon(Icons.list),
