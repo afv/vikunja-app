@@ -26,5 +26,11 @@
   "calendarNothingMatches": "Nenhuma tarefa corresponde aos filtros",
   "calendarClearFilters": "Limpar filtros",
   "calendarSource": "Mostrar",
-  "calendarSourceAll": "Todas as tarefas"
+  "calendarSourceAll": "Todas as tarefas",
+  "dueChipLabel": "Data limite {date}",
+  "keepAsText": "Manter como texto",
+  "phraseKeptAsText": "«{phrase}» mantido como texto",
+  "useAsDate": "Usar como data",
+  "keepAsTextFor": "Manter «{phrase}» como texto, não como data",
+  "useAsDateFor": "Usar «{phrase}» como data limite"
 }

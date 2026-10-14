@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:vikunja_app/core/utils/natural_date.dart';
 import 'package:vikunja_app/core/theming/app_colors.dart';
 import 'package:vikunja_app/core/utils/date_extensions.dart';
 import 'package:vikunja_app/core/utils/priority.dart';
@@ -42,6 +44,12 @@ class AddTaskDialogState extends State<AddTaskDialog> {
   int? selectedProjectId;
   int priority = 0;
 
+  /// Date phrases (`NaturalDateMatch.key`) the user chose to keep as part of the title.
+  final List<String> _ignoredPhrases = [];
+
+  /// The user picked a due option or date in this dialog: it wins over a date typed in the title.
+  bool _dueExplicit = false;
+
   @override
   void initState() {
     super.initState();
@@ -67,6 +75,99 @@ class AddTaskDialogState extends State<AddTaskDialog> {
 
   void _onTitleChanged() {
     setState(() {});
+  }
+
+  /// `15/10` is read day first on a device whose locale writes the day before the month.
+  bool _dayFirst() {
+    try {
+      final pattern =
+          DateFormat.yMd(Localizations.localeOf(context).toString()).pattern ??
+          '';
+      final day = pattern.indexOf('d');
+      final month = pattern.indexOf('M');
+      return day == -1 || month == -1 ? true : day < month;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  /// The title as typed, read for a date phrase («amanhã às 12»). The time of a phrase that names only a day is the
+  /// same nearest hour the due-date chips use.
+  NaturalDateResult _parse({bool ignoring = true}) {
+    final now = DateTime.now();
+    return parseNaturalDate(
+      textController.text,
+      now,
+      defaultTime: DefaultTime(NewTaskDue.none.calculateNearestHours(now), 0),
+      dayFirst: _dayFirst(),
+      ignore: ignoring ? _ignoredPhrases : const [],
+    );
+  }
+
+  String _formatDue(NaturalDateMatch match) {
+    final locale = Localizations.localeOf(context).toString();
+    try {
+      final day = DateFormat.MMMEd(locale).format(match.date);
+      return match.hasTime
+          ? '$day, ${DateFormat.Hm(locale).format(match.date)}'
+          : day;
+    } catch (_) {
+      return match.hasTime
+          ? match.date.formatShort()
+          : DateFormat.yMMMd().format(match.date);
+    }
+  }
+
+  /// Under the title: the date the typed words will become (tap to keep them as text), or, once kept, a muted chip
+  /// to read them as a date again.
+  Widget _phraseChip(AppLocalizations l10n) {
+    final match = _parse().match;
+    if (match != null) {
+      return Padding(
+        padding: const EdgeInsets.only(top: 8),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: InputChip(
+            key: const Key('natural-date-chip'),
+            visualDensity: VisualDensity.compact,
+            avatar: const Icon(Icons.event, size: 18),
+            label: Text(
+              '${l10n.dueChipLabel(_formatDue(match))}  «${match.text}»',
+              overflow: TextOverflow.ellipsis,
+            ),
+            tooltip: l10n.keepAsTextFor(match.text),
+            deleteIcon: const Icon(Icons.close, size: 16),
+            deleteButtonTooltipMessage: l10n.keepAsText,
+            onPressed: () => setState(() => _ignoredPhrases.add(match.key)),
+            onDeleted: () => setState(() => _ignoredPhrases.add(match.key)),
+          ),
+        ),
+      );
+    }
+    if (_ignoredPhrases.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final kept = _parse(ignoring: false).match;
+    if (kept == null || !_ignoredPhrases.contains(kept.key)) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: ActionChip(
+          key: const Key('natural-date-kept-chip'),
+          visualDensity: VisualDensity.compact,
+          avatar: const Icon(Icons.event_busy, size: 18),
+          label: Text(
+            l10n.phraseKeptAsText(kept.text),
+            overflow: TextOverflow.ellipsis,
+          ),
+          tooltip: l10n.useAsDateFor(kept.text),
+          onPressed: () => setState(() => _ignoredPhrases.remove(kept.key)),
+        ),
+      ),
+    );
   }
 
   @override
@@ -108,6 +209,7 @@ class AddTaskDialogState extends State<AddTaskDialog> {
                 ),
                 controller: textController,
               ),
+              _phraseChip(l10n),
               if (widget.projects.length > 1)
                 Padding(
                   padding: const EdgeInsets.only(top: 12.0),
@@ -171,6 +273,7 @@ class AddTaskDialogState extends State<AddTaskDialog> {
                     onChanged: (value) {
                       setState(() => newTaskDue = NewTaskDue.custom);
                       dueDate = value;
+                      _dueExplicit = true;
                     },
                   ),
                 ),
@@ -253,9 +356,10 @@ class AddTaskDialogState extends State<AddTaskDialog> {
           onPressed: _normalizedTitle.isEmpty
               ? null
               : () {
+                  // an explicit due date wins over one typed in the title, which is cut out of the title either way
                   widget.onAddTask(
                     _normalizedTitle,
-                    dueDate,
+                    _dueExplicit ? dueDate : (_parse().match?.date ?? dueDate),
                     selectedProjectId,
                     priority,
                   );
@@ -268,7 +372,7 @@ class AddTaskDialogState extends State<AddTaskDialog> {
   }
 
   String get _normalizedTitle {
-    return _capitalizeFirst(textController.text.trim());
+    return _capitalizeFirst(_parse().title.trim());
   }
 
   String _capitalizeFirst(String value) {
@@ -289,6 +393,7 @@ class AddTaskDialogState extends State<AddTaskDialog> {
       selected: newTaskDue == thisNewTaskDue,
       onSelected: (value) {
         newTaskDue = thisNewTaskDue;
+        _dueExplicit = true;
         setState(() {
           if (newTaskDue == NewTaskDue.custom ||
               newTaskDue == NewTaskDue.none) {
