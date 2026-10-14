@@ -309,5 +309,7 @@
   "calendarClear": "Clear",
   "calendarNoLabels": "No labels on these tasks",
   "calendarWeek": "Week",
-  "calendarDay": "Day"
+  "calendarDay": "Day",
+  "calendarNothingMatches": "No tasks match these filters",
+  "calendarClearFilters": "Clear filters"
 }

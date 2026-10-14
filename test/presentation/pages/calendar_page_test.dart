@@ -69,6 +69,7 @@ void main() {
         dueDate: DateTime(now.year, now.month, 15, 10),
         labels: [Label(id: 5, title: 'limpeza')],
       ),
+      Task(id: 3, title: 'Tarefa de hoje', createdBy: null, projectId: 1, dueDate: DateTime(now.year, now.month, now.day, 12)),
       Task(id: 2, title: 'Regar plantas', createdBy: null, projectId: 2, dueDate: DateTime(now.year, now.month, 15, 18)),
     ]);
     await tester.pumpWidget(
@@ -132,5 +133,27 @@ void main() {
     await pump(tester, FakeSettings(settings.stored));
     expect(find.text('Aspirar a casa'), findsOneWidget);
     expect(find.text('Regar plantas'), findsNothing);
+  });
+
+  testWidgets('week and day show the task columns, starting on this week and on today', (tester) async {
+    await pump(tester);
+    await tester.tap(find.text('Week'));
+    await tester.pumpAndSettle();
+    // the week opens on its Monday; a task of the 15th is within the three columns only when the 15th is near
+    final now = DateTime.now();
+    final monday = now.subtract(Duration(days: now.weekday - DateTime.monday));
+    expect(find.text('${monday.day}'), findsWidgets);
+
+    await tester.tap(find.text('Day'));
+    await tester.pumpAndSettle();
+    expect(find.text('${now.day}'), findsWidgets);
+  });
+
+  testWidgets("the day view lists today's tasks with their project", (tester) async {
+    await pump(tester);
+    await tester.tap(find.text('Day'));
+    await tester.pumpAndSettle();
+    expect(find.text('Tarefa de hoje'), findsOneWidget);
+    expect(find.text('Casa'), findsOneWidget); // the project path under the title
   });
 }

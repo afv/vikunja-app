@@ -10,6 +10,7 @@ import 'package:vikunja_app/domain/entities/project.dart';
 import 'package:vikunja_app/domain/entities/task.dart';
 import 'package:vikunja_app/l10n/gen/app_localizations.dart';
 import 'package:vikunja_app/presentation/pages/task/task_detail_page.dart';
+import 'package:vikunja_app/presentation/widgets/calendar/calendar_days.dart';
 import 'package:vikunja_app/presentation/widgets/calendar/calendar_filters_sheet.dart';
 
 /// A task on the calendar, at its due date. Recurring tasks show their next occurrence only, as the server stores it.
@@ -28,13 +29,7 @@ class TaskEvent extends KalenderEvent {
 
   @override
   TaskEvent copyWithData({required DateTime start, required DateTime end}) =>
-      TaskEvent(
-        task: task,
-        color: color,
-        path: path,
-        start: start,
-        end: end,
-      );
+      TaskEvent(task: task, color: color, path: path, start: start, end: end);
 
   @override
   bool operator ==(Object other) =>
@@ -48,8 +43,12 @@ class TaskEvent extends KalenderEvent {
           other.path == path;
 
   @override
-  int get hashCode => Object.hash(super.hashCode, task.id, task.title, task.done, color, path);
+  int get hashCode =>
+      Object.hash(super.hashCode, task.id, task.title, task.done, color, path);
 }
+
+/// Month and agenda come from kalender; week and day are our own day columns (see [CalendarDays]).
+enum CalendarMode { month, week, day, agenda }
 
 class CalendarPage extends ConsumerStatefulWidget {
   const CalendarPage({super.key});
@@ -63,17 +62,33 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
   static const _pageSize = 50; // the server's default maximum page size
 
   final _month = MonthViewConfiguration.singleMonth();
-  final _week = MultiDayViewConfiguration.week(
-    initialTimeOfDay: const KalenderTime(hour: 7, minute: 0),
-  );
-  final _day = MultiDayViewConfiguration.singleDay(
-    initialTimeOfDay: const KalenderTime(hour: 7, minute: 0),
-  );
   final _agenda = ScheduleViewConfiguration.continuous();
   final _events = DefaultEventsController();
   late final KalenderController _controller = KalenderController(
     viewConfiguration: _month,
   );
+
+  CalendarMode _mode = CalendarMode.month;
+  final _daysKey = GlobalKey<CalendarDaysState>();
+  late DateTime _daysStart = DateTime.now();
+  DateTimeRange? _daysRange;
+  final _daysFocus = ValueNotifier<DateTime>(DateTime.now());
+  List<TaskEvent> _taskEvents = [];
+
+  bool get _custom => _mode == CalendarMode.week || _mode == CalendarMode.day;
+
+  /// What is on screen right now, whichever view is showing it.
+  DateTimeRange get _currentRange {
+    if (_custom) {
+      return _daysRange ??
+          DateTimeRange(
+            start: _daysStart,
+            end: _daysStart.add(const Duration(days: 7)),
+          );
+    }
+    final visible = _controller.visibleDateTimeRange.value;
+    return DateTimeRange(start: visible.start, end: visible.end);
+  }
 
   CalendarFilters _filters = const CalendarFilters();
   List<Project> _projects = [];
@@ -98,11 +113,17 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
     _controller.visibleDateTimeRange.removeListener(_onRangeChanged);
     _controller.dispose();
     _events.dispose();
+    _daysFocus.dispose();
     super.dispose();
   }
 
   void _onRangeChanged() {
+    if (_custom) return;
     final visible = _controller.visibleDateTimeRange.value;
+    _rangeChanged(DateTimeRange(start: visible.start, end: visible.end));
+  }
+
+  void _rangeChanged(DateTimeRange visible) {
     final loaded = _loaded;
     if (loaded != null &&
         !visible.start.isBefore(loaded.start) &&
@@ -117,7 +138,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
 
   /// A month either side of what is visible, so paging back and forth does not wait on the network every time.
   DateTimeRange _wanted() {
-    final visible = _controller.visibleDateTimeRange.value;
+    final visible = _currentRange;
     return DateTimeRange(
       start: DateTime(visible.start.year, visible.start.month - 1, 1),
       end: DateTime(visible.end.year, visible.end.month + 2, 1),
@@ -136,7 +157,11 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
     var ok = true;
     for (var page = 1; page <= _maxPages; page++) {
       final response = await ref.read(taskRepositoryProvider).getByFilterString(
-        dueDateRangeFilter(wanted.start, wanted.end, showDone: _filters.showDone),
+        dueDateRangeFilter(
+          wanted.start,
+          wanted.end,
+          showDone: _filters.showDone,
+        ),
         {
           'filter_include_nulls': ['false'],
           'sort_by': ['due_date', 'id'],
@@ -168,7 +193,9 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
   Future<void> _loadProjects() async {
     final all = <Project>[];
     for (var page = 1; page <= _maxPages; page++) {
-      final response = await ref.read(projectRepositoryProvider).getAll(page: page);
+      final response = await ref
+          .read(projectRepositoryProvider)
+          .getAll(page: page);
       if (!response.isSuccessful) break;
       final batch = response.toSuccess().body;
       all.addAll(batch);
@@ -182,7 +209,9 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
     final events = <TaskEvent>[];
     for (final task in _tasks) {
       final due = task.dueDate;
-      if (!task.hasDueDate || due == null || !_filters.isVisible(task)) continue;
+      if (!task.hasDueDate || due == null || !_filters.isVisible(task)) {
+        continue;
+      }
       final project = byId[task.projectId];
       final projectColor = colorForProject(task.projectId ?? 0, project?.color);
       final color = _filters.colorByProject
@@ -200,6 +229,65 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
       );
     }
     _events.replaceEvents(events);
+    setState(() => _taskEvents = events);
+  }
+
+  /// Switching view keeps the date the old view started on, which for the month is the first grid cell (28 September
+  /// in October), not what the user is looking at. Land on today when it is on screen, else the middle of the range.
+  void _switchTo(CalendarMode mode) {
+    final visible = _currentRange;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final inView =
+        !today.isBefore(visible.start) && today.isBefore(visible.end);
+    final focus = inView
+        ? today
+        : visible.start.add(
+            Duration(
+              microseconds:
+                  visible.end.difference(visible.start).inMicroseconds ~/ 2,
+            ),
+          );
+    setState(() {
+      _mode = mode;
+      // the week opens on its Monday; scrolling from there goes day by day
+      _daysStart = mode == CalendarMode.week
+          ? mondayOf(focus)
+          : DateTime(focus.year, focus.month, focus.day);
+      _daysRange = null;
+      _daysFocus.value = _daysStart;
+    });
+    if (!_custom) {
+      _controller.viewConfiguration = mode == CalendarMode.month
+          ? _month
+          : _agenda;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _controller.jumpToDate(focus);
+      });
+    }
+  }
+
+  void _today() {
+    final now = DateTime.now();
+    if (!_custom) {
+      _controller.animateToDate(now);
+      return;
+    }
+    _daysKey.currentState?.animateTo(
+      _mode == CalendarMode.week ? mondayOf(now) : now,
+    );
+  }
+
+  void _step(int direction) {
+    if (!_custom) {
+      direction < 0
+          ? _controller.animateToPreviousPage()
+          : _controller.animateToNextPage();
+      return;
+    }
+    _daysKey.currentState?.shift(
+      direction * (_mode == CalendarMode.week ? 7 : 1),
+    );
   }
 
   Future<void> _openFilters() async {
@@ -220,7 +308,9 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
 
   Future<void> _restoreFilters() async {
     try {
-      final stored = await ref.read(settingsRepositoryProvider).getCalendarFilters();
+      final stored = await ref
+          .read(settingsRepositoryProvider)
+          .getCalendarFilters();
       if (stored != null && mounted) {
         _filters = CalendarFilters.fromJson(jsonDecode(stored));
       }
@@ -231,7 +321,9 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
 
   Future<void> _saveFilters(CalendarFilters filters) async {
     try {
-      await ref.read(settingsRepositoryProvider).setCalendarFilters(jsonEncode(filters.toJson()));
+      await ref
+          .read(settingsRepositoryProvider)
+          .setCalendarFilters(jsonEncode(filters.toJson()));
     } catch (_) {
       // best effort: the filters still apply for this session
     }
@@ -252,7 +344,9 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
       if (i >= 0) _tasks[i] = saved;
       _refreshEvents();
     } else {
-      messenger.showSnackBar(SnackBar(content: Text(l10n.calendarRescheduleError)));
+      messenger.showSnackBar(
+        SnackBar(content: Text(l10n.calendarRescheduleError)),
+      );
       _refreshEvents(); // put the tile back where the server has it
     }
   }
@@ -270,34 +364,36 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final scheme = Theme.of(context).colorScheme;
-    final filtering = _filters.hiddenProjects.isNotEmpty || _filters.labels.isNotEmpty;
+    final filtering =
+        _filters.hiddenProjects.isNotEmpty || _filters.labels.isNotEmpty;
 
     return Scaffold(
       appBar: AppBar(
-        title: ValueListenableBuilder(
-          valueListenable: _controller.floatingVisibleRange,
-          builder: (context, range, _) {
-            final month = range.dominantMonthDate;
-            return Text(
-              DateFormat.yMMMM(Localizations.localeOf(context).toLanguageTag()).format(month),
-            );
-          },
-        ),
+        title: _custom
+            ? ValueListenableBuilder(
+                valueListenable: _daysFocus,
+                builder: (context, day, _) => Text(_monthTitle(context, day)),
+              )
+            : ValueListenableBuilder(
+                valueListenable: _controller.floatingVisibleRange,
+                builder: (context, range, _) =>
+                    Text(_monthTitle(context, range.dominantMonthDate)),
+              ),
         actions: [
           IconButton(
             tooltip: l10n.calendarToday,
             icon: const Icon(Icons.today),
-            onPressed: () => _controller.animateToDate(DateTime.now()),
+            onPressed: _today,
           ),
           IconButton(
             tooltip: l10n.calendarPrevious,
             icon: const Icon(Icons.chevron_left),
-            onPressed: _controller.animateToPreviousPage,
+            onPressed: () => _step(-1),
           ),
           IconButton(
             tooltip: l10n.calendarNext,
             icon: const Icon(Icons.chevron_right),
-            onPressed: _controller.animateToNextPage,
+            onPressed: () => _step(1),
           ),
           IconButton(
             tooltip: l10n.calendarFilters,
@@ -312,20 +408,28 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
           preferredSize: const Size.fromHeight(52),
           child: Padding(
             padding: const EdgeInsets.only(bottom: 8),
-            child: ListenableBuilder(
-              listenable: _controller,
-              builder: (context, _) => SegmentedButton<ViewConfiguration>(
-                showSelectedIcon: false,
-                segments: [
-                  ButtonSegment(value: _month, label: Text(l10n.calendarMonth)),
-                  ButtonSegment(value: _week, label: Text(l10n.calendarWeek)),
-                  ButtonSegment(value: _day, label: Text(l10n.calendarDay)),
-                  ButtonSegment(value: _agenda, label: Text(l10n.calendarAgenda)),
-                ],
-                selected: {_controller.viewConfiguration},
-                onSelectionChanged: (selection) =>
-                    _controller.viewConfiguration = selection.first,
-              ),
+            child: SegmentedButton<CalendarMode>(
+              showSelectedIcon: false,
+              segments: [
+                ButtonSegment(
+                  value: CalendarMode.month,
+                  label: Text(l10n.calendarMonth),
+                ),
+                ButtonSegment(
+                  value: CalendarMode.week,
+                  label: Text(l10n.calendarWeek),
+                ),
+                ButtonSegment(
+                  value: CalendarMode.day,
+                  label: Text(l10n.calendarDay),
+                ),
+                ButtonSegment(
+                  value: CalendarMode.agenda,
+                  label: Text(l10n.calendarAgenda),
+                ),
+              ],
+              selected: {_mode},
+              onSelectionChanged: (selection) => _switchTo(selection.first),
             ),
           ),
         ),
@@ -333,6 +437,29 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
       body: Column(
         children: [
           if (_loading) const LinearProgressIndicator(minHeight: 2),
+          if (!_loading &&
+              !_failed &&
+              _loaded != null &&
+              _taskEvents.isEmpty &&
+              filtering)
+            ListTile(
+              dense: true,
+              leading: const Icon(Icons.filter_alt_off_outlined),
+              title: Text(l10n.calendarNothingMatches),
+              trailing: TextButton(
+                onPressed: () {
+                  setState(
+                    () => _filters = _filters.copyWith(
+                      hiddenProjects: {},
+                      labels: {},
+                    ),
+                  );
+                  _saveFilters(_filters);
+                  _refreshEvents();
+                },
+                child: Text(l10n.calendarClearFilters),
+              ),
+            ),
           if (_failed)
             MaterialBanner(
               backgroundColor: scheme.errorContainer,
@@ -340,53 +467,73 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
               actions: [TextButton(onPressed: _load, child: Text(l10n.retry))],
             ),
           Expanded(
-            child: KalenderView(
-              eventsController: _events,
-              kalenderController: _controller,
-              locale: Localizations.localeOf(context),
-              interaction: KalenderInteraction(
-                allowResizing: false,
-                allowEventCreation: false,
-                // A tap opens the task; moving one takes a long press, so scrolling never moves a due date.
-                modifyEventGesture: EventInteractionGesture.longPress,
-              ),
-              callbacks: KalenderCallbacks(
-                onEventTapped: (event) {
-                  if (event is TaskEvent) _open(event);
-                },
-                onEventChanged: (original, updated) {
-                  if (original is TaskEvent && updated is TaskEvent) {
-                    _reschedule(original, updated);
-                  }
-                },
-              ),
-              views: [
-                MonthViewParts(
-                  body: MonthBody(tileComponents: TileComponents(tileBuilder: _tile)),
-                ),
-                ScheduleViewParts(
-                  body: ScheduleBody(
-                    tileComponents: ScheduleTileComponents(tileBuilder: _agendaTile),
+            child: _custom
+                ? CalendarDays(
+                    key: ValueKey(_mode),
+                    events: _taskEvents,
+                    start: _daysStart,
+                    columns: _mode == CalendarMode.week ? 3 : 1,
+                    onTap: _open,
+                    onVisibleDays: (start, end) {
+                      _daysFocus.value = start;
+                      _daysRange = DateTimeRange(start: start, end: end);
+                      _rangeChanged(_daysRange!);
+                    },
+                  )
+                : KalenderView(
+                    eventsController: _events,
+                    kalenderController: _controller,
+                    locale: Localizations.localeOf(context),
+                    interaction: KalenderInteraction(
+                      allowResizing: false,
+                      allowEventCreation: false,
+                      // A tap opens the task; moving one takes a long press, so scrolling never moves a due date.
+                      modifyEventGesture: EventInteractionGesture.longPress,
+                    ),
+                    callbacks: KalenderCallbacks(
+                      onEventTapped: (event) {
+                        if (event is TaskEvent) _open(event);
+                      },
+                      onEventChanged: (original, updated) {
+                        if (original is TaskEvent && updated is TaskEvent) {
+                          _reschedule(original, updated);
+                        }
+                      },
+                    ),
+                    views: [
+                      MonthViewParts(
+                        body: MonthBody(
+                          tileComponents: TileComponents(tileBuilder: _tile),
+                        ),
+                      ),
+                      ScheduleViewParts(
+                        body: ScheduleBody(
+                          tileComponents: ScheduleTileComponents(
+                            tileBuilder: _agendaTile,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                MultiDayViewParts(
-                  body: MultiDayBody(
-                    // Many tasks share 10:00 or 18:00; keep each tile readable instead of a hair-thin sliver.
-                    configuration: MultiDayBodyConfiguration(minimumTileHeight: 28),
-                    tileComponents: TileComponents(tileBuilder: _hourTile),
-                  ),
-                ),
-              ],
-            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _tile(BuildContext context, KalenderEvent event, KalenderDateTimeRange tileRange) {
+  String _monthTitle(BuildContext context, DateTime month) => DateFormat.yMMMM(
+    Localizations.localeOf(context).toLanguageTag(),
+  ).format(month);
+
+  Widget _tile(
+    BuildContext context,
+    KalenderEvent event,
+    KalenderDateTimeRange tileRange,
+  ) {
     final e = event as TaskEvent;
-    final foreground = e.color.computeLuminance() > 0.5 ? Colors.black : Colors.white;
+    final foreground = e.color.computeLuminance() > 0.5
+        ? Colors.black
+        : Colors.white;
     return Container(
       margin: const EdgeInsets.only(bottom: 1),
       padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -408,30 +555,11 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
     );
   }
 
-  Widget _hourTile(BuildContext context, KalenderEvent event, KalenderDateTimeRange tileRange) {
-    final e = event as TaskEvent;
-    final foreground = e.color.computeLuminance() > 0.5 ? Colors.black : Colors.white;
-    return Container(
-      margin: const EdgeInsets.only(right: 1, bottom: 1),
-      padding: const EdgeInsets.all(3),
-      decoration: BoxDecoration(
-        color: e.color.withValues(alpha: e.task.done ? 0.45 : 1),
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Text(
-        e.task.title,
-        overflow: TextOverflow.ellipsis,
-        maxLines: 2,
-        style: TextStyle(
-          fontSize: 11,
-          color: foreground,
-          decoration: e.task.done ? TextDecoration.lineThrough : null,
-        ),
-      ),
-    );
-  }
-
-  Widget _agendaTile(BuildContext context, KalenderEvent event, KalenderDateTimeRange tileRange) {
+  Widget _agendaTile(
+    BuildContext context,
+    KalenderEvent event,
+    KalenderDateTimeRange tileRange,
+  ) {
     final e = event as TaskEvent;
     final theme = Theme.of(context);
     final time = TimeOfDay.fromDateTime(e.start).format(context);

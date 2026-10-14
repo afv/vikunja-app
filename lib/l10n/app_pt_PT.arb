@@ -22,5 +22,7 @@
   "calendarClear": "Limpar",
   "calendarNoLabels": "Sem etiquetas nestas tarefas",
   "calendarWeek": "Semana",
-  "calendarDay": "Dia"
+  "calendarDay": "Dia",
+  "calendarNothingMatches": "Nenhuma tarefa corresponde aos filtros",
+  "calendarClearFilters": "Limpar filtros"
 }
