@@ -5,14 +5,15 @@ import 'package:vikunja_app/domain/entities/task.dart';
 import 'package:vikunja_app/l10n/gen/app_localizations.dart';
 
 /// The calendar's filter sheet: colour by task or project, finished tasks, the project tree, label chips.
-/// Returns the new filters, or null when it was dismissed without a change.
-Future<CalendarFilters?> showCalendarFilters(
+/// Every change is reported through [onChanged] as it is made, so it applies however the sheet is closed.
+Future<void> showCalendarFilters(
   BuildContext context, {
   required List<Project> projects,
   required List<Task> tasks,
   required CalendarFilters filters,
+  required ValueChanged<CalendarFilters> onChanged,
 }) {
-  return showModalBottomSheet<CalendarFilters>(
+  return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
@@ -26,6 +27,7 @@ Future<CalendarFilters?> showCalendarFilters(
         projects: projects,
         labels: labelsInUse(tasks),
         initial: filters,
+        onChanged: onChanged,
       ),
     ),
   );
@@ -36,12 +38,14 @@ class _FiltersBody extends StatefulWidget {
   final List<Project> projects;
   final List<LabelUse> labels;
   final CalendarFilters initial;
+  final ValueChanged<CalendarFilters> onChanged;
 
   const _FiltersBody({
     required this.scroll,
     required this.projects,
     required this.labels,
     required this.initial,
+    required this.onChanged,
   });
 
   @override
@@ -53,7 +57,10 @@ class _FiltersBodyState extends State<_FiltersBody> {
   late final List<ProjectNode> _tree = buildProjectTree(widget.projects);
   final Set<int> _collapsed = {};
 
-  void _apply(CalendarFilters next) => setState(() => _filters = next);
+  void _apply(CalendarFilters next) {
+    setState(() => _filters = next);
+    widget.onChanged(next);
+  }
 
   Iterable<Widget> _rows(ProjectNode node, int depth) sync* {
     final state = nodeState(node, _filters.hiddenProjects);
@@ -128,12 +135,7 @@ class _FiltersBodyState extends State<_FiltersBody> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final heading = Theme.of(context).textTheme.labelLarge;
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) Navigator.pop(context, _filters);
-      },
-      child: ListView(
+    return ListView(
         controller: widget.scroll,
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
         children: [
@@ -209,7 +211,6 @@ class _FiltersBodyState extends State<_FiltersBody> {
               ],
             ),
         ],
-      ),
     );
   }
 }

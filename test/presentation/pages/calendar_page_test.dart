@@ -8,6 +8,7 @@ import 'package:vikunja_app/domain/entities/label.dart';
 import 'package:vikunja_app/domain/entities/project.dart';
 import 'package:vikunja_app/domain/entities/task.dart';
 import 'package:vikunja_app/domain/repositories/project_repository.dart';
+import 'package:vikunja_app/domain/repositories/settings_repository.dart';
 import 'package:vikunja_app/domain/repositories/task_repository.dart';
 import 'package:vikunja_app/l10n/gen/app_localizations.dart';
 import 'package:vikunja_app/presentation/pages/calendar_page.dart';
@@ -16,6 +17,17 @@ class FakeProjects extends Fake implements ProjectRepository {
   @override
   Future<Response<List<Project>>> getAll({int page = 1, String? search}) async =>
       SuccessResponse([Project(id: 1, title: 'Casa'), Project(id: 2, title: 'Aveiro')], 200, {});
+}
+
+class FakeSettings extends Fake implements SettingsRepository {
+  String? stored;
+  FakeSettings([this.stored]);
+
+  @override
+  Future<String?> getCalendarFilters() async => stored;
+
+  @override
+  Future<void> setCalendarFilters(String json) async => stored = json;
 }
 
 class FakeTasks extends Fake implements TaskRepository {
@@ -43,7 +55,7 @@ class FakeTasks extends Fake implements TaskRepository {
 void main() {
   setUpAll(() => initializeDateFormatting('en'));
 
-  Future<FakeTasks> pump(WidgetTester tester) async {
+  Future<FakeTasks> pump(WidgetTester tester, [FakeSettings? settings]) async {
     tester.view.physicalSize = const Size(900, 1600);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
@@ -64,6 +76,7 @@ void main() {
         overrides: [
           taskRepositoryProvider.overrideWithValue(fake),
           projectRepositoryProvider.overrideWithValue(FakeProjects()),
+          settingsRepositoryProvider.overrideWithValue(settings ?? FakeSettings()),
         ],
         child: MaterialApp(
           home: const CalendarPage(),
@@ -91,8 +104,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.text('Aveiro'));
     await tester.pumpAndSettle();
-    // closing the sheet applies the filters
-    await tester.tapAt(const Offset(10, 10));
+    // applied at once, without closing the sheet
     await tester.pumpAndSettle();
     expect(find.text('Aspirar a casa'), findsOneWidget);
     expect(find.text('Regar plantas'), findsNothing);
@@ -104,5 +116,21 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.textContaining('Casa'), findsWidgets);
     expect(find.text('limpeza'), findsOneWidget);
+  });
+
+  testWidgets('a filter change is saved, and a saved one is applied on the next start', (tester) async {
+    final settings = FakeSettings();
+    await pump(tester, settings);
+    await tester.tap(find.byTooltip('Filters'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Aveiro'));
+    await tester.pumpAndSettle();
+    expect(settings.stored, contains('"hiddenProjects":[2]'));
+
+    // a new page, as after restarting the app
+    await tester.pumpWidget(const SizedBox());
+    await pump(tester, FakeSettings(settings.stored));
+    expect(find.text('Aspirar a casa'), findsOneWidget);
+    expect(find.text('Regar plantas'), findsNothing);
   });
 }

@@ -39,6 +39,14 @@ class SettingsDatasource {
     );
   }
 
+  Future<String?> getCalendarFilters() {
+    return _storage.read(key: "calendar-filters");
+  }
+
+  Future<void> setCalendarFilters(String json) {
+    return _storage.write(key: "calendar-filters", value: json);
+  }
+
   Future<int> getRefreshInterval() {
     return _storage
         .read(key: "workmanager-duration")

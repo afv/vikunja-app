@@ -124,6 +124,25 @@ class CalendarFilters {
     showDone: showDone ?? this.showDone,
   );
 
+  Map<String, dynamic> toJson() => {
+    'hiddenProjects': hiddenProjects.toList(),
+    'labels': labels.toList(),
+    'colorByProject': colorByProject,
+    'showDone': showDone,
+  };
+
+  /// Whatever comes out of storage becomes a valid state; garbage falls back to the defaults.
+  factory CalendarFilters.fromJson(Object? json) {
+    if (json is! Map) return const CalendarFilters();
+    Set<int> ids(Object? v) => v is List ? v.whereType<int>().toSet() : <int>{};
+    return CalendarFilters(
+      hiddenProjects: ids(json['hiddenProjects']),
+      labels: ids(json['labels']),
+      colorByProject: json['colorByProject'] == true,
+      showDone: json['showDone'] == true,
+    );
+  }
+
   bool isVisible(Task task) {
     if (task.projectId != null && hiddenProjects.contains(task.projectId)) {
       return false;

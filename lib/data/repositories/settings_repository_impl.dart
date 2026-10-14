@@ -68,6 +68,13 @@ class SettingsRepositoryImpl implements SettingsRepository {
   }
 
   @override
+  Future<String?> getCalendarFilters() => _datasource.getCalendarFilters();
+
+  @override
+  Future<void> setCalendarFilters(String json) =>
+      _datasource.setCalendarFilters(json);
+
+  @override
   Future<bool> getLandingPageOnlyDueDateTasks() {
     return _datasource.getLandingPageOnlyDueDateTasks();
   }

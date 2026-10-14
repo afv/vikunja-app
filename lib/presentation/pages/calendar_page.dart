@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
@@ -79,7 +81,10 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
   void initState() {
     super.initState();
     _controller.visibleDateTimeRange.addListener(_onRangeChanged);
-    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await _restoreFilters();
+      _load();
+    });
   }
 
   @override
@@ -189,19 +194,37 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
   }
 
   Future<void> _openFilters() async {
-    final changed = await showCalendarFilters(
+    await showCalendarFilters(
       context,
       projects: _projects,
       tasks: _tasks,
       filters: _filters,
+      onChanged: (changed) {
+        if (!mounted) return;
+        final reload = changed.showDone != _filters.showDone;
+        setState(() => _filters = changed);
+        _saveFilters(changed);
+        reload ? _load() : _refreshEvents();
+      },
     );
-    if (changed == null || !mounted) return;
-    final reload = changed.showDone != _filters.showDone;
-    setState(() => _filters = changed);
-    if (reload) {
-      await _load();
-    } else {
-      _refreshEvents();
+  }
+
+  Future<void> _restoreFilters() async {
+    try {
+      final stored = await ref.read(settingsRepositoryProvider).getCalendarFilters();
+      if (stored != null && mounted) {
+        _filters = CalendarFilters.fromJson(jsonDecode(stored));
+      }
+    } catch (_) {
+      // no stored filters, or unreadable ones: start with the defaults
+    }
+  }
+
+  Future<void> _saveFilters(CalendarFilters filters) async {
+    try {
+      await ref.read(settingsRepositoryProvider).setCalendarFilters(jsonEncode(filters.toJson()));
+    } catch (_) {
+      // best effort: the filters still apply for this session
     }
   }
 

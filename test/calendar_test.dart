@@ -146,4 +146,18 @@ void main() {
     expect(rescheduledDue(task(1, due: due), due.add(const Duration(days: 1))), due.add(const Duration(days: 1)));
     expect(rescheduledDue(task(1), due), isNull);
   });
+
+  test('filters survive a round trip through JSON, and garbage gives the defaults', () {
+    const f = CalendarFilters(hiddenProjects: {3, 4}, labels: {10}, colorByProject: true, showDone: true);
+    final back = CalendarFilters.fromJson(f.toJson());
+    expect(back.hiddenProjects, {3, 4});
+    expect(back.labels, {10});
+    expect(back.colorByProject, isTrue);
+    expect(back.showDone, isTrue);
+    final bad = CalendarFilters.fromJson('nope');
+    expect(bad.hiddenProjects, isEmpty);
+    expect(bad.labels, isEmpty);
+    expect(bad.colorByProject, isFalse);
+    expect(CalendarFilters.fromJson({'hiddenProjects': 'x', 'labels': [1, 'a']}).labels, {1});
+  });
 }

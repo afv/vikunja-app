@@ -13,6 +13,10 @@ abstract class SettingsRepository {
 
   Future<void> setVersionNotifications(bool value);
 
+  Future<String?> getCalendarFilters();
+
+  Future<void> setCalendarFilters(String json);
+
   Future<int> getRefreshInterval();
 
   Future<void> setRefreshInterval(int minutes);
