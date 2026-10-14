@@ -2,13 +2,16 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_widget_from_html/flutter_widget_from_html.dart';
+import 'package:html/dom.dart' as dom;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:vikunja_app/core/di/repository_provider.dart';
 import 'package:vikunja_app/core/utils/date_extensions.dart';
+import 'package:vikunja_app/core/utils/task_list_html.dart';
 import 'package:vikunja_app/domain/entities/task.dart';
 import 'package:vikunja_app/domain/entities/task_attachment.dart';
 import 'package:vikunja_app/domain/entities/task_reminder.dart';
 import 'package:vikunja_app/l10n/gen/app_localizations.dart';
+import 'package:vikunja_app/presentation/manager/projects_controller.dart';
 import 'package:vikunja_app/presentation/pages/task/task_edit_page.dart';
 import 'package:vikunja_app/presentation/utils/attachment_utils.dart';
 import 'package:vikunja_app/presentation/utils/html_linkify.dart';
@@ -79,6 +82,75 @@ class _TaskDetailPageState extends ConsumerState<TaskDetailPage> {
     }
   }
 
+  /// Ticks a checkbox of the description and saves the task (the screen shows the change at once).
+  Future<void> _toggleTaskItem(int index, bool checked) async {
+    final task = _task!;
+    final description = setTaskItemChecked(task.description, index, checked);
+    if (description == task.description) return;
+    final updated = task.copyWith(description: description);
+    setState(() => _task = updated);
+    final response = await ref.read(taskRepositoryProvider).update(updated);
+    if (!mounted) return;
+    if (response.isSuccessful) {
+      setState(() => _task = response.toSuccess().body);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(AppLocalizations.of(context).taskSaveError)),
+      );
+      await _refresh();
+    }
+  }
+
+  Widget? _buildTaskItem(dom.Element element) {
+    if (!isTaskItem(element)) return null;
+    final index = taskItemIndex(element);
+    final checked = isTaskItemChecked(element);
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SizedBox(
+          width: 32,
+          height: 32,
+          child: Checkbox(
+            value: checked,
+            onChanged: index < 0
+                ? null
+                : (value) => _toggleTaskItem(index, value ?? false),
+          ),
+        ),
+        const SizedBox(width: 4),
+        Expanded(
+          child: Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: HtmlWidget(
+              taskItemContentHtml(element),
+              onTapUrl: _onLinkTap,
+              textStyle: checked
+                  ? const TextStyle(decoration: TextDecoration.lineThrough)
+                  : null,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// «REP-16 · 🔧 Reparar & Projectos»: the card's id and its board, which the title alone doesn't tell.
+  String _subtitle(Task task) {
+    final parts = <String>[
+      if (task.identifier.isNotEmpty) task.identifier else '#${task.id}',
+    ];
+    final projects =
+        ref.watch(projectsControllerProvider).valueOrNull?.projects ?? [];
+    for (final project in projects) {
+      if (project.id == task.projectId) {
+        parts.add(project.title);
+        break;
+      }
+    }
+    return parts.join(' · ');
+  }
+
   void _edit() {
     Navigator.push<Task?>(
       context,
@@ -134,78 +206,94 @@ class _TaskDetailPageState extends ConsumerState<TaskDetailPage> {
           ),
         ],
       ),
+      // Long-press selects the title, the id and the description, to copy them.
       body: RefreshIndicator(
         onRefresh: _refresh,
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
-          children: [
-            Text(task.title, style: theme.textTheme.headlineSmall),
-            if (task.labels.isNotEmpty) ...[
+        child: SelectionArea(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 32),
+            children: [
+              Text(task.title, style: theme.textTheme.headlineSmall),
+              const SizedBox(height: 4),
+              Text(
+                _subtitle(task),
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+              if (task.labels.isNotEmpty) ...[
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: task.labels
+                      .map((label) => LabelWidget(label: label))
+                      .toList(),
+                ),
+              ],
+              const Divider(height: 24),
+              // Description
+              Text(l10n.description, style: theme.textTheme.titleMedium),
               const SizedBox(height: 8),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: task.labels
-                    .map((label) => LabelWidget(label: label))
-                    .toList(),
+              HtmlWidget(
+                linkifyHtml(
+                  task.description.isNotEmpty
+                      ? task.description
+                      : l10n.noDescription,
+                ),
+                onTapUrl: _onLinkTap,
+                customWidgetBuilder: _buildTaskItem,
+                // no bullets in checkbox lists: the checkbox is the marker
+                customStylesBuilder: (element) =>
+                    element.attributes['data-type'] == 'taskList'
+                    ? {'list-style-type': 'none', 'padding-left': '0'}
+                    : null,
               ),
+              const SizedBox(height: 16),
+              // Due date
+              _infoRow(
+                icon: Icons.access_time,
+                text: task.hasDueDate
+                    ? task.dueDate!.toLocal().formatShort()
+                    : l10n.noDueDate,
+              ),
+              // Start date
+              _infoRow(
+                icon: Icons.play_arrow_rounded,
+                text: task.hasStartDate
+                    ? task.startDate!.toLocal().formatShort()
+                    : l10n.noStartDate,
+              ),
+              // End date
+              _infoRow(
+                icon: Icons.stop_rounded,
+                text: task.hasEndDate
+                    ? task.endDate!.toLocal().formatShort()
+                    : l10n.noEndDate,
+              ),
+              // Reminders
+              ...task.reminderDates.map(
+                (TaskReminder reminder) => _infoRow(
+                  icon: Icons.share_arrival_time_outlined,
+                  text: reminder.reminder.toLocal().formatShort(),
+                ),
+              ),
+              // Priority
+              _infoRow(
+                icon: Icons.priority_high,
+                text: priorityToStringLocalized(context, task.priority),
+              ),
+              // Progress
+              _infoRow(
+                icon: Icons.percent,
+                text: task.percentDone != null
+                    ? '${(task.percentDone! * 100).toInt()}%'
+                    : l10n.percentUnset,
+              ),
+              const Divider(height: 24),
+              _buildAttachmentsSection(theme, l10n),
             ],
-            const Divider(height: 24),
-            // Description
-            Text(l10n.description, style: theme.textTheme.titleMedium),
-            const SizedBox(height: 8),
-            HtmlWidget(
-              linkifyHtml(
-                task.description.isNotEmpty
-                    ? task.description
-                    : l10n.noDescription,
-              ),
-              onTapUrl: _onLinkTap,
-            ),
-            const SizedBox(height: 16),
-            // Due date
-            _infoRow(
-              icon: Icons.access_time,
-              text: task.hasDueDate
-                  ? task.dueDate!.toLocal().formatShort()
-                  : l10n.noDueDate,
-            ),
-            // Start date
-            _infoRow(
-              icon: Icons.play_arrow_rounded,
-              text: task.hasStartDate
-                  ? task.startDate!.toLocal().formatShort()
-                  : l10n.noStartDate,
-            ),
-            // End date
-            _infoRow(
-              icon: Icons.stop_rounded,
-              text: task.hasEndDate
-                  ? task.endDate!.toLocal().formatShort()
-                  : l10n.noEndDate,
-            ),
-            // Reminders
-            ...task.reminderDates.map(
-              (TaskReminder reminder) => _infoRow(
-                icon: Icons.share_arrival_time_outlined,
-                text: reminder.reminder.toLocal().formatShort(),
-              ),
-            ),
-            // Priority
-            _infoRow(
-              icon: Icons.priority_high,
-              text: priorityToStringLocalized(context, task.priority),
-            ),
-            // Progress
-            _infoRow(
-              icon: Icons.percent,
-              text: task.percentDone != null
-                  ? '${(task.percentDone! * 100).toInt()}%'
-                  : l10n.percentUnset,
-            ),
-            const Divider(height: 24),
-            _buildAttachmentsSection(theme, l10n),
-          ],
+          ),
         ),
       ),
     );
