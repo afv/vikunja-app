@@ -7,10 +7,12 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:vikunja_app/core/di/repository_provider.dart';
 import 'package:vikunja_app/core/utils/date_extensions.dart';
 import 'package:vikunja_app/core/utils/task_list_html.dart';
+import 'package:vikunja_app/domain/entities/project.dart';
 import 'package:vikunja_app/domain/entities/task.dart';
 import 'package:vikunja_app/domain/entities/task_attachment.dart';
 import 'package:vikunja_app/domain/entities/task_reminder.dart';
 import 'package:vikunja_app/l10n/gen/app_localizations.dart';
+import 'package:vikunja_app/presentation/pages/project/project_detail_page.dart';
 import 'package:vikunja_app/presentation/pages/task/task_edit_page.dart';
 import 'package:vikunja_app/presentation/utils/attachment_utils.dart';
 import 'package:vikunja_app/presentation/utils/html_linkify.dart';
@@ -28,7 +30,9 @@ class TaskDetailPage extends ConsumerStatefulWidget {
 
 class _TaskDetailPageState extends ConsumerState<TaskDetailPage> {
   Task? _task;
-  List<String> _breadcrumb = [];
+
+  /// (title, board to open) — the column entry opens its board.
+  List<(String, Project)> _breadcrumb = [];
   bool _uploading = false;
 
   @override
@@ -54,23 +58,25 @@ class _TaskDetailPageState extends ConsumerState<TaskDetailPage> {
     final task = _task;
     if (task == null || task.projectId == null) return;
     final projects = ref.read(projectRepositoryProvider);
-    final titles = <String>[];
+    final crumbs = <(String, Project)>[];
     var projectId = task.projectId!;
     for (var depth = 0; projectId > 0 && depth < 6; depth++) {
       final response = await projects.get(projectId);
       if (!response.isSuccessful) break;
       final project = response.toSuccess().body;
-      titles.insert(0, project.title);
+      crumbs.insert(0, (project.title, project));
       projectId = project.parentProjectId;
     }
     final buckets = await ref
         .read(taskRepositoryProvider)
         .getBucketTitles(task.id);
-    if (buckets.isSuccessful && buckets.toSuccess().body.isNotEmpty) {
-      titles.add(buckets.toSuccess().body.first);
+    if (crumbs.isNotEmpty &&
+        buckets.isSuccessful &&
+        buckets.toSuccess().body.isNotEmpty) {
+      crumbs.add((buckets.toSuccess().body.first, crumbs.last.$2));
     }
     if (!mounted) return;
-    setState(() => _breadcrumb = titles);
+    setState(() => _breadcrumb = crumbs);
   }
 
   Future<void> _uploadAttachment() async {
@@ -172,6 +178,44 @@ class _TaskDetailPageState extends ConsumerState<TaskDetailPage> {
     return parts.join(' · ');
   }
 
+  Widget _buildBreadcrumb(ThemeData theme) {
+    final linkStyle = theme.textTheme.bodyMedium?.copyWith(
+      color: theme.colorScheme.primary,
+    );
+    final children = <Widget>[];
+    for (final (index, (title, project)) in _breadcrumb.indexed) {
+      if (index > 0) {
+        children.add(Text('›', style: theme.textTheme.bodyMedium));
+      }
+      children.add(
+        InkWell(
+          onTap: () => _openProject(project),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Text(title, style: linkStyle),
+          ),
+        ),
+      );
+    }
+    return Wrap(
+      spacing: 6,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: children,
+    );
+  }
+
+  void _openProject(Project project) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ProjectDetailPage(
+          key: Key(project.id.toString()),
+          project: project,
+        ),
+      ),
+    );
+  }
+
   void _edit() {
     Navigator.push<Task?>(
       context,
@@ -244,10 +288,7 @@ class _TaskDetailPageState extends ConsumerState<TaskDetailPage> {
               ),
               if (_breadcrumb.isNotEmpty) ...[
                 const SizedBox(height: 4),
-                Text(
-                  _breadcrumb.join('  ›  '),
-                  style: theme.textTheme.bodyMedium,
-                ),
+                _buildBreadcrumb(theme),
               ],
               if (task.labels.isNotEmpty) ...[
                 const SizedBox(height: 8),
