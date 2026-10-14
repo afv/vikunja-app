@@ -60,6 +60,8 @@ class CalendarPage extends ConsumerStatefulWidget {
 
 class _CalendarPageState extends ConsumerState<CalendarPage> {
   static const _maxPages = 20;
+  // A request that never answers must end in the retry banner, not in a spinner that never stops.
+  static const _requestTimeout = Duration(seconds: 20);
   static const _pageSize = 50; // the server's default maximum page size
 
   final _month = MonthViewConfiguration.singleMonth();
@@ -173,7 +175,8 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
                 'page': ['$page'],
                 'per_page': ['$_pageSize'],
               },
-            );
+            )
+            .timeout(_requestTimeout);
         if (!response.isSuccessful) {
           ok = false;
           break;
@@ -204,7 +207,8 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
     for (var page = 1; page <= _maxPages; page++) {
       final response = await ref
           .read(projectRepositoryProvider)
-          .getAll(page: page);
+          .getAll(page: page)
+          .timeout(_requestTimeout);
       if (!response.isSuccessful) break;
       final batch = response.toSuccess().body;
       all.addAll(batch);
