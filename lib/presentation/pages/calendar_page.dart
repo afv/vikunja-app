@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:developer' as developer;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -155,30 +156,38 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
 
     final tasks = <Task>[];
     var ok = true;
-    for (var page = 1; page <= _maxPages; page++) {
-      final response = await ref.read(taskRepositoryProvider).getByFilterString(
-        dueDateRangeFilter(
-          wanted.start,
-          wanted.end,
-          showDone: _filters.showDone,
-        ),
-        {
-          'filter_include_nulls': ['false'],
-          'sort_by': ['due_date', 'id'],
-          'order_by': ['asc', 'asc'],
-          'page': ['$page'],
-          'per_page': ['$_pageSize'],
-        },
-      );
-      if (!response.isSuccessful) {
-        ok = false;
-        break;
+    try {
+      for (var page = 1; page <= _maxPages; page++) {
+        final response = await ref
+            .read(taskRepositoryProvider)
+            .getByFilterString(
+              dueDateRangeFilter(
+                wanted.start,
+                wanted.end,
+                showDone: _filters.showDone,
+              ),
+              {
+                'filter_include_nulls': ['false'],
+                'sort_by': ['due_date', 'id'],
+                'order_by': ['asc', 'asc'],
+                'page': ['$page'],
+                'per_page': ['$_pageSize'],
+              },
+            );
+        if (!response.isSuccessful) {
+          ok = false;
+          break;
+        }
+        final batch = response.toSuccess().body;
+        tasks.addAll(batch);
+        if (batch.length < _pageSize) break;
       }
-      final batch = response.toSuccess().body;
-      tasks.addAll(batch);
-      if (batch.length < _pageSize) break;
+      if (_projects.isEmpty) await _loadProjects();
+    } catch (e, st) {
+      // Whatever went wrong, the spinner must stop and the retry banner must show.
+      developer.log('calendar load failed: $e', stackTrace: st);
+      ok = false;
     }
-    if (_projects.isEmpty) await _loadProjects();
 
     if (!mounted || generation != _generation) return; // a newer load took over
     setState(() {
