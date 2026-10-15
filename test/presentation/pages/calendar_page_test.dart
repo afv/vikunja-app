@@ -82,13 +82,15 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     final now = DateTime.now();
+    // two fixed-looking days that are never today, so the tests do not depend on the date they run
+    final day = now.day == 15 ? 20 : 15;
     final fake = FakeTasks([
       Task(
         id: 1,
         title: 'Aspirar a casa',
         createdBy: null,
         projectId: 1,
-        dueDate: DateTime(now.year, now.month, 15, 10),
+        dueDate: DateTime(now.year, now.month, day, 10),
         labels: [Label(id: 5, title: 'limpeza')],
       ),
       Task(
@@ -103,7 +105,7 @@ void main() {
         title: 'Regar plantas',
         createdBy: null,
         projectId: 2,
-        dueDate: DateTime(now.year, now.month, 15, 18),
+        dueDate: DateTime(now.year, now.month, day, 18),
       ),
     ]);
     await tester.pumpWidget(
@@ -181,24 +183,21 @@ void main() {
     },
   );
 
-  testWidgets(
-    'week and day show the task columns, starting on this week and on today',
-    (tester) async {
-      await pump(tester);
-      await tester.tap(find.text('Week'));
-      await tester.pumpAndSettle();
-      // the week opens on its Monday; a task of the 15th is within the three columns only when the 15th is near
-      final now = DateTime.now();
-      final monday = now.subtract(
-        Duration(days: now.weekday - DateTime.monday),
-      );
-      expect(find.text('${monday.day}'), findsWidgets);
+  testWidgets('the week view opens on this week\'s Monday', (tester) async {
+    await pump(tester);
+    await tester.tap(find.text('Week'));
+    await tester.pumpAndSettle();
+    final now = DateTime.now();
+    final monday = now.subtract(Duration(days: now.weekday - DateTime.monday));
+    expect(find.text('${monday.day}'), findsWidgets);
+  });
 
-      await tester.tap(find.text('Day'));
-      await tester.pumpAndSettle();
-      expect(find.text('${now.day}'), findsWidgets);
-    },
-  );
+  testWidgets('the day view opens on today', (tester) async {
+    await pump(tester);
+    await tester.tap(find.text('Day'));
+    await tester.pumpAndSettle();
+    expect(find.text('${DateTime.now().day}'), findsWidgets);
+  });
 
   testWidgets("the day view lists today's tasks with their project", (
     tester,
