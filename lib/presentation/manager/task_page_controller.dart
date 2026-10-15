@@ -183,8 +183,11 @@ class TaskPageController extends _$TaskPageController
     var user = ref.read(currentUserProvider);
     if (user != null) {
       Map<String, dynamic>? frontendSettings = user.settings?.frontendSettings;
-      int? filterId = frontendSettings?["filter_id_used_on_overview"];
-      if (filterId != null && filterId != 0) {
+      final filterId = overviewFilterForQuery(
+        frontendSettings?["filter_id_used_on_overview"] as int?,
+        query,
+      );
+      if (filterId != null) {
         final queryParameters = <String, List<String>>{
           "sort_by": ["due_date", "id"],
           "order_by": ["asc", "desc"],
@@ -319,4 +322,12 @@ class TaskPageController extends _$TaskPageController
 
     state = AsyncData(value.copyWith(tasks: List<Task>.from(tasks)));
   }
+}
+
+/// The saved filter that scopes the home list, or null for all tasks. The web's «filter used on the overview»
+/// shapes the list (e.g. «due in the next 14 days»), but a search looks through every task: otherwise a task due
+/// later can't be found from the home screen.
+int? overviewFilterForQuery(int? overviewFilterId, String query) {
+  if (overviewFilterId == null || overviewFilterId == 0) return null;
+  return query.trim().isEmpty ? overviewFilterId : null;
 }
