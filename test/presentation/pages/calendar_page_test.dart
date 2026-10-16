@@ -183,13 +183,13 @@ void main() {
     },
   );
 
-  testWidgets('the week view opens on this week\'s Monday', (tester) async {
+  testWidgets('the week view opens with today among its columns', (
+    tester,
+  ) async {
     await pump(tester);
     await tester.tap(find.text('Week'));
     await tester.pumpAndSettle();
-    final now = DateTime.now();
-    final monday = now.subtract(Duration(days: now.weekday - DateTime.monday));
-    expect(find.text('${monday.day}'), findsWidgets);
+    expect(find.text('${DateTime.now().day}'), findsWidgets);
   });
 
   testWidgets('the day view opens on today', (tester) async {

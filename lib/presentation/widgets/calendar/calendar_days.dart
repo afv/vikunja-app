@@ -8,6 +8,14 @@ DateTime _dayOf(DateTime d) => DateTime(d.year, d.month, d.day);
 DateTime mondayOf(DateTime d) =>
     _dayOf(d).subtract(Duration(days: d.weekday - DateTime.monday));
 
+/// The first column of the week view when it opens on [focus]: the week's Monday while [focus] is among the first three
+/// days (the three columns on screen), else the day before [focus], so the day looked at is always visible.
+DateTime weekStartFor(DateTime focus) {
+  final monday = mondayOf(focus);
+  final offset = _dayOf(focus).difference(monday).inDays;
+  return offset <= 2 ? monday : _dayOf(focus).subtract(const Duration(days: 1));
+}
+
 /// Week and day views: a row of day columns, each listing that day's tasks by time. It scrolls day by day (the week
 /// view shows several columns and scrolls freely; the day view shows one and snaps), and it never squeezes tasks
 /// into an hourly grid, where the many cards due at the same hour would be unreadable.

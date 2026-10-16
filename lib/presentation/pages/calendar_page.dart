@@ -291,9 +291,9 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
           );
     setState(() {
       _mode = mode;
-      // the week opens on its Monday; scrolling from there goes day by day
+      // the week opens on its Monday, or one day before today when today is past the third column
       _daysStart = mode == CalendarMode.week
-          ? mondayOf(focus)
+          ? weekStartFor(focus)
           : DateTime(focus.year, focus.month, focus.day);
       _daysRange = null;
       _daysFocus.value = _daysStart;
@@ -315,7 +315,7 @@ class _CalendarPageState extends ConsumerState<CalendarPage> {
       return;
     }
     _daysKey.currentState?.animateTo(
-      _mode == CalendarMode.week ? mondayOf(now) : now,
+      _mode == CalendarMode.week ? weekStartFor(now) : now,
     );
   }
 
